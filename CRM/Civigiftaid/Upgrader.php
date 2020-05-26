@@ -97,13 +97,12 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'extends'   => 'Contribution',
       ],
       [
-        'title'                => 'Gift Aid Declaration',
+        'title'                => 'Gift Aid',
         'style'                => 'Inline',
         'collapse_display'     => 0,
-        'help_pre'             => 'Stores the values that are submitted in the Gift Aid Report',
+        'help_pre'             => 'Stores the Gift Aid values for contributions',
         'table_name'           => 'civicrm_value_gift_aid_submission',
         'is_multiple'          => 0,
-        'style'                => 'Tab',
         'collapse_adv_display' => 0,
         'weight'               => 2,
       ]
