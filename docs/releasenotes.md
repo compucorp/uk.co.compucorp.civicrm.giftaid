@@ -1,3 +1,11 @@
+## Unrleased yet.
+
+* Add date declaration was given, as well as the start date. (Currently
+  defaults to the same.)
+
+* Fix bug when recording a not-eligible declaration and a future
+  is-eligible declaration exists.
+
 ## Release 3.3.11
 
 * Use "Primary" address instead of "Home" address for declarations.
