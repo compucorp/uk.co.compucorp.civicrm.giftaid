@@ -342,8 +342,8 @@ class CRM_Civigiftaid_Declaration {
       $endTimestamp = strtotime($newParams['end_date']);
     }
     else {
-      if (isset($newParams['start_date'])) {
-        $endTimestamp = strtotime($newParams['start_date']);
+      if (isset($futureDeclaration['start_date'])) {
+        $endTimestamp = strtotime($futureDeclaration['start_date']);
       }
     }
 
