@@ -196,7 +196,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       unset(Civi::$statics[E::LONG_NAME]); //['updatedDeclarationAmount']);
       unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
       // Fix annoying date format thing.
-      foreach (['start_date', 'end_date'] as $_) {
+      foreach (['start_date', 'end_date', 'given_date'] as $_) {
         if (!empty($declaration[$_])) {
           $declaration[$_] = preg_replace('/[^0-9]/', '', $declaration[$_]);
         }

@@ -231,7 +231,7 @@ class CRM_Civigiftaid_Declaration {
       if (empty($params['given_date'])) {
         // We should store a given date. Default to the start_date, but if that's not
         // given, assume now.
-        $params['given_date'] = $params['start_date'] ?? date('Y-m-d H:i:s');
+        $params['given_date'] = $params['start_date'] ?? date('YmdHis');
       }
       $count = 1;
       foreach ($cols as $colName => $colType) {
