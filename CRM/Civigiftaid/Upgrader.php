@@ -566,6 +566,24 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   }
 
   /**
+   * Add given date.
+   *
+   */
+  public function upgrade_3110() {
+    $this->log('Add given date field.');
+    $this->ensureCustomGroups();
+    $this->ensureCustomFields();
+    // Update any records missing a given date.
+    $sql = "UPDATE civicrm_value_gift_aid_declaration
+      SET given_date = start_date
+      WHERE given_date IS NULL";
+
+    CRM_Core_DAO::executeQuery($sql);
+
+    return TRUE;
+  }
+
+  /**
    * @return array
    */
   private function getCustomFields() {
@@ -633,6 +651,25 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'note_columns' => '60',
         'note_rows' => '4',
         'column_name' => 'post_code',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupId,
+        'name' => 'given_date',
+        'label' => 'Date declaration given',
+        'data_type' => 'Date',
+        'html_type' => 'Select Date',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '4',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'date_format' => 'dd-mm-yy',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'given_date',
         'in_selector' => '0',
       ],
       [
