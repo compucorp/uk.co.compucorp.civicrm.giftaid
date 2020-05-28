@@ -139,7 +139,16 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
   private static function getMissingGiftAidDeclarationMessage($contactId) {
     $giftAidDeclarationGroupId = self::getGiftAidDeclarationGroupId();
     $selectedTab = 'custom_' . $giftAidDeclarationGroupId;
-    $link = "<a href='/civicrm/contact/view/?reset=1&gid={$giftAidDeclarationGroupId}&cid={$contactId}&selectedChild={$selectedTab}'>" . E::ts('here') . "</a>";
+    $link = CRM_Utils_System::url(
+      'civicrm/contact/view',
+      [
+        'reset' => 1,
+        'gid' => $giftAidDeclarationGroupId,
+        'cid' => $contactId,
+        'selectedChild' => $selectedTab,
+      ]
+    );
+    $link = "<a href='{$link}'>" . E::ts('here') . "</a>";
 
     return E::ts("This contribution has been automatically marked as Eligible for Gift Aid.
       This is because the administrator has indicated that it's financial type is Eligible for Gift Aid.
