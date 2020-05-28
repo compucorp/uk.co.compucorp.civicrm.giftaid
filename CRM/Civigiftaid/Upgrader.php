@@ -97,13 +97,12 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'extends'   => 'Contribution',
       ],
       [
-        'title'                => 'Gift Aid Declaration',
+        'title'                => 'Gift Aid',
         'style'                => 'Inline',
         'collapse_display'     => 0,
-        'help_pre'             => 'Stores the values that are submitted in the Gift Aid Report',
+        'help_pre'             => 'Stores the Gift Aid values for contributions',
         'table_name'           => 'civicrm_value_gift_aid_submission',
         'is_multiple'          => 0,
-        'style'                => 'Tab',
         'collapse_adv_display' => 0,
         'weight'               => 2,
       ]
@@ -565,6 +564,26 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3109() {
+    $this->log('Disable "Yes, in the past 4 years" for contributions if it exists');
+    try {
+      $optionValueParams = [
+        'option_group_id' => 'uk_taxpayer_options',
+        'name' => 'uk_taxpayer_past_four_years',
+      ];
+      $optionValue = civicrm_api3('OptionValue', 'getsingle', $optionValueParams);
+      $optionValueParams['id'] = $optionValue['id'];
+      if (empty($optionValue['is_active'])) {
+        $optionValueParams['is_active'] = 0;
+        civicrm_api3('OptionValue', 'create', $optionValueParams);
+      }
+    }
+    catch(Exception $e) {
+      // Ok, it doesn't exist. Good.
+    }
+    return TRUE;
+  }
+
   /**
    * @return array
    */
@@ -914,15 +933,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'label' => 'No',
         'value' => 0,
         'name' => 'not_uk_taxpayer',
-        'is_default' => 0,
-        'is_reserved' => 1,
-      ],
-      [
-        'option_group_id' => $this->optionGroupNameToId['uk_taxpayer_options'],
-        'label' => 'Yes, in the Past 4 Years',
-        'value' => 3,
-        'name' => 'uk_taxpayer_past_four_years',
-        'is_active' => 0,
         'is_default' => 0,
         'is_reserved' => 1,
       ],
