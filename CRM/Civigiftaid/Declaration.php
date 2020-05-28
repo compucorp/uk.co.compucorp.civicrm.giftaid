@@ -57,6 +57,7 @@ class CRM_Civigiftaid_Declaration {
     $declarationParams = [
       'entity_id' => $contribution['contact_id'],
       'start_date' => CRM_Utils_Date::isoToMysql($contribution['receive_date']),
+      'given_date' => CRM_Utils_Date::isoToMysql($contribution['receive_date']),
       'address' => $addressDetails,
       'post_code' => $postCode,
       'eligible_for_gift_aid' => $contactGiftAidEligibleStatus,
@@ -137,7 +138,7 @@ class CRM_Civigiftaid_Declaration {
    */
   public static function getAllDeclarations($contactID) {
     if (!isset(Civi::$statics[__CLASS__][$contactID]['declarations'])) {
-      $sql = "SELECT id, entity_id, eligible_for_gift_aid, start_date, end_date, reason_ended, source, notes
+      $sql = "SELECT id, entity_id, eligible_for_gift_aid, start_date, given_date, end_date, reason_ended, source, notes
               FROM civicrm_value_gift_aid_declaration
               WHERE  entity_id = %1";
       $sqlParams[1] = [$contactID, 'Integer'];
@@ -200,6 +201,7 @@ class CRM_Civigiftaid_Declaration {
       'address' => 'String',
       'post_code' => 'String',
       'start_date' => 'Timestamp',
+      'given_date' => 'Timestamp',
       'end_date' => 'Timestamp',
       'reason_ended' => 'String',
       'source' => 'String',
@@ -226,6 +228,11 @@ class CRM_Civigiftaid_Declaration {
     }
     else {
       // We will create a new record.
+      if (empty($params['given_date'])) {
+        // We should store a given date. Default to the start_date, but if that's not
+        // given, assume now.
+        $params['given_date'] = $params['start_date'] ?? date('Y-m-d H:i:s');
+      }
       $count = 1;
       foreach ($cols as $colName => $colType) {
         $insertVals[$colName] = CRM_Utils_Array::value($colName, $params, '');
@@ -286,6 +293,7 @@ class CRM_Civigiftaid_Declaration {
    *               - entity_id:  the Individual for whom we will create/update declaration
    *               - eligible_for_gift_aid: 3=Yes+past 4 years,1=Yes,0=No
    *               - start_date: start date of declaration (in ISO date format)
+   *               - given_date: date declaration was provided (in ISO date format)
    *               - end_date:   end date of declaration (in ISO date format)
    *
    * @throws \CRM_Core_Exception

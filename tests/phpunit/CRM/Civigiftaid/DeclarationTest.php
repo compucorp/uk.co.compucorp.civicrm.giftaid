@@ -255,14 +255,14 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     $yesPast4 = CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS;
     return [
       [
-        'existing no, adding a yes',
+        'existing no, adding a yes (also tests ommitted given_date and provided given_date)',
         [
           ['start_date' => '2020-01-01 00:00:00', 'eligible_for_gift_aid' => $no],
-          ['start_date' => '2020-05-01 00:00:00', 'eligible_for_gift_aid' => $yes],
+          ['start_date' => '2020-05-01 00:00:00', 'given_date' => '2020-04-01 00:00:00', 'eligible_for_gift_aid' => $yes],
         ],
         [
-          ['start_date' => '2020-01-01 00:00:00', 'eligible_for_gift_aid' => $no, 'end_date' => '2020-05-01 00:00:00'],
-          ['start_date' => '2020-05-01 00:00:00', 'eligible_for_gift_aid' => $yes],
+          ['start_date' => '2020-01-01 00:00:00', 'given_date' => '2020-01-01 00:00:00', 'eligible_for_gift_aid' => $no, 'end_date' => '2020-05-01 00:00:00'],
+          ['start_date' => '2020-05-01 00:00:00', 'given_date' => '2020-04-01 00:00:00', 'eligible_for_gift_aid' => $yes],
         ]
       ],
 
