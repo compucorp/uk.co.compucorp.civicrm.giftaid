@@ -151,15 +151,6 @@ class CRM_Civigiftaid_Declaration {
   }
 
   /**
-   * Update a declaration record.
-   *
-   * @param array $params
-   */
-  private static function updateDeclaration($params) {
-    self::insertDeclaration($params);
-  }
-
-  /**
    * Get the (table) ID and the eligibility of the last added (may not be most recent) gift aid declaration for a contact
    *
    * When submitting a profile with a (Individual) eligible_for_gift_aid field we get a partial declaration created
@@ -187,6 +178,29 @@ class CRM_Civigiftaid_Declaration {
     }
 
     return [];
+  }
+
+  /**
+   * Update the address on the current declaration for a contact
+   * This is usually triggered when creating/editing a declaration from the contact record
+   *
+   * @param array $params
+   *
+   * @throws \CiviCRM_API3_Exception
+   */
+  public static function updateDeclarationAddress($params) {
+    // Get the current declaration for the contact
+    $currentDeclaration = CRM_Civigiftaid_Declaration::getDeclaration($params['entity_id']);
+
+    // Only update address if empty. Get current address/postcode formatted for giftaid.
+    if (empty($currentDeclaration['address']) || empty($currentDeclaration['post_code'])) {
+      // Get the home address of the contact
+      list($updateParams['address'], $updateParams['post_code']) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($params['entity_id']);
+    }
+    if (!empty($updateParams)) {
+      $updateParams['id'] = $currentDeclaration['id'];
+      CRM_Civigiftaid_Declaration::insertDeclaration($updateParams);
+    }
   }
 
   /**
@@ -375,7 +389,7 @@ class CRM_Civigiftaid_Declaration {
             'end_date' => $newParams['start_date'],
           ];
           $updateParams = self::addReasonEndedContactDeclined($updateParams);
-          CRM_Civigiftaid_Declaration::updateDeclaration($updateParams);
+          CRM_Civigiftaid_Declaration::insertDeclaration($updateParams);
           unset($newParams['id'], $newParams['end_date']);
           if (empty($newParams['source'])) {
             $newParams['source'] = CRM_Core_Session::singleton()->get('postProcessTitle', E::LONG_NAME);
@@ -403,9 +417,10 @@ class CRM_Civigiftaid_Declaration {
               $updateParams['end_date'] = $newEndDate;
             }
           }
+
           if (!empty($updateParams)) {
             $updateParams['id'] = $currentDeclaration['id'];
-            CRM_Civigiftaid_Declaration::updateDeclaration($updateParams);
+            CRM_Civigiftaid_Declaration::insertDeclaration($updateParams);
           }
         }
         break;
@@ -429,7 +444,7 @@ class CRM_Civigiftaid_Declaration {
             'end_date' => $newParams['start_date'],
           ];
           $updateParams = self::addReasonEndedContactDeclined($updateParams);
-          CRM_Civigiftaid_Declaration::updateDeclaration($updateParams);
+          CRM_Civigiftaid_Declaration::insertDeclaration($updateParams);
           unset($newParams['id'], $newParams['end_date']);
           if (empty($newParams['source'])) {
             $newParams['source'] = CRM_Core_Session::singleton()->get('postProcessTitle', E::LONG_NAME);
@@ -479,7 +494,7 @@ class CRM_Civigiftaid_Declaration {
     // end_date, since ORDER BY end_date DESC will put NULL values last.
     $currentDeclaration = [];
     $sql = "
-        SELECT id, entity_id, eligible_for_gift_aid, start_date, end_date, reason_ended, source, notes
+        SELECT id, entity_id, eligible_for_gift_aid, start_date, end_date, reason_ended, source, notes, address, post_code
         FROM   civicrm_value_gift_aid_declaration
         WHERE  entity_id = %1 AND start_date <= %2 AND (end_date > %2 OR end_date IS NULL)
         ORDER BY end_date DESC";
@@ -499,6 +514,8 @@ class CRM_Civigiftaid_Declaration {
       $currentDeclaration['reason_ended'] = (string) $dao->reason_ended;
       $currentDeclaration['source'] = (string) $dao->source;
       $currentDeclaration['notes'] = (string) $dao->notes;
+      $currentDeclaration['address'] = (string) $dao->address;
+      $currentDeclaration['post_code'] = (string) $dao->post_code;
     }
     return $currentDeclaration;
   }

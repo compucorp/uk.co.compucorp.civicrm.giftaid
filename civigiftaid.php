@@ -183,8 +183,6 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
 
 /**
  * Implementation of hook_civicrm_postProcess
- * To copy the contact's home address to the declaration, when the declaration is created
- * Only for offline contribution
  *
  * @param string $formName
  * @param \CRM_Core_Form $form
@@ -192,6 +190,7 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
  * @throws \CiviCRM_API3_Exception
  */
 function civigiftaid_civicrm_postProcess($formName, &$form) {
+  // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
@@ -211,6 +210,8 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
     return;
   }
 
+  // Copy the contact's home address to the declaration, when the declaration is created
+  // Only for offline contribution
   $groupID = $form->getVar('_groupID');
   $contactID = $form->getVar('_entityId');
   $customGroupTableName = civicrm_api3('CustomGroup', 'getvalue', [
@@ -219,33 +220,8 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   ]);
 
   if ($customGroupTableName == 'civicrm_value_gift_aid_declaration') {
-    // Get the latest declaration for the contact
-    $sql = "
-      SELECT MAX(id) FROM {$customGroupTableName}
-      WHERE entity_id = %1";
-    $params = [1 => [$contactID, 'Integer']];
-    $rowId = CRM_Core_DAO::singleValueQuery($sql, $params);
-
-    $sql = "
-    SELECT * FROM {$customGroupTableName}
-    WHERE id=%1";
-    $dao = CRM_Core_DAO::executeQuery($sql, [1 => [$rowId, 'Integer']]);
-    $dao->fetch();
-
-    // Get the home address of the contact
-    list($addressDetails, $postCode) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($contactID);
-    $sqlSET[] = 'address = %2';
-    $sqlSET[] = 'post_code = %3';
-    $queryParams[2] = [$addressDetails, 'String'];
-    $queryParams[3] = [$postCode, 'String'];
-
-    $queryParams[4] = [$rowId, 'Integer'];
-    $sql = "
-      UPDATE {$customGroupTableName}
-      SET " . implode(', ', $sqlSET) . "
-      WHERE  id = %4";
-
-    CRM_Core_DAO::executeQuery($sql, $queryParams);
+    $declarationUpdateParams = ['entity_id' => $contactID];
+    CRM_Civigiftaid_Declaration::updateDeclarationAddress($declarationUpdateParams);
   }
 }
 
