@@ -13,6 +13,10 @@ The extension is licensed under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0
 
 See: https://docs.civicrm.org/sysadmin/en/latest/customize/extensions/#installing-a-new-extension
 
+## Related
+
+To make online submissions directly from CiviCRM you can install the https://lab.civicrm.org/extensions/ukgiftaidsubmission extension.
+
 ## Future development
 
 #### Addresses
