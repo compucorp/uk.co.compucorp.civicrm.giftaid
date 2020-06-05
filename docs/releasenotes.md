@@ -1,10 +1,27 @@
-## Unrleased yet.
+## Release 3.4
+This release adds unit tests, fixes multiple issues, improves documentation and adds a field "Given Date" to the declaration.
 
+* Update empty address when updating declaration
 * Add date declaration was given, as well as the start date. (Currently
   defaults to the same.)
-
 * Fix bug when recording a not-eligible declaration and a future
   is-eligible declaration exists.
+* Fix #3 - generate correct link for gift aid declaration tab
+* Don't create 'Yes, in past 4 years' optionvalue for contributions on install....
+* Fix issues with Contribution customfield metadata in installer
+* Trigger postInstall hook which is required on install to set revision so upgrader steps are not run
+* Followup re gitlab issue #2 - fix problem with shared field name
+* Fix license link
+* Update documentation
+* Fix gitlab issue #2: cannot reinstall after uninstall
+* Add eligibility flowchart (graphviz .dot format source)
+* Don't worry about calculating gift aid fields twice
+* Add unit tests
+* fix issue #24 setDeclaration called with missing eligible_for_gift_aid param
+* Identify eligibility by line items not contribution financial type. Fixes issue #19
+* Fix install wrongly setting table-level default batch; add first two tests
+* Improve code readability and avoid duplicated method calls
+* Simplify fetching list of entity_ids
 
 ## Release 3.3.11
 
