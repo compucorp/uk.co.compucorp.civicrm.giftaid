@@ -27,6 +27,18 @@ class CRM_Civigiftaid_Declaration {
    * @throws \CiviCRM_API3_Exception
    */
   public static function update($contributionID) {
+    // If declaration updated via contribution page etc. it will have been set in postProcess
+    $session = CRM_Core_Session::singleton();
+    if ($session->get('uktaxpayer', E::LONG_NAME)) {
+      $contactGiftAidEligibleStatus = $session->get('uktaxpayer', E::LONG_NAME);
+    }
+
+    // Get the gift aid eligible status
+    // If it's not a valid number don't do any further processing
+    if (!isset($contactGiftAidEligibleStatus)) {
+      return;
+    }
+
     $contributionCustomGiftAidEligibleFieldName = CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid');
     $contributionCustomGiftAidBatchNameFieldName = CRM_Civigiftaid_Utils::getCustomByName('Batch_Name', 'Gift_Aid');
 
@@ -40,24 +52,14 @@ class CRM_Civigiftaid_Declaration {
       ]
     ]);
 
-    // If declaration updated via contribution page etc. it will have been set in postProcess
-    $session = CRM_Core_Session::singleton();
-    if ($session->get('uktaxpayer', E::LONG_NAME)) {
-      $contactGiftAidEligibleStatus = $session->get('uktaxpayer', E::LONG_NAME);
-    }
-
-    // Get the gift aid eligible status
-    // If it's not a valid number don't do any further processing
-    if (!isset($contactGiftAidEligibleStatus)) {
-      return;
-    }
-
-    list($addressDetails, $postCode) = self::getAddressAndPostalCode($contribution['contact_id']);
+    $startDate = $givenDate = $contribution['receive_date'];
+    $contactID = $contribution['contact_id'];
+    list($addressDetails, $postCode) = self::getAddressAndPostalCode($contactID);
 
     $declarationParams = [
-      'entity_id' => $contribution['contact_id'],
-      'start_date' => CRM_Utils_Date::isoToMysql($contribution['receive_date']),
-      'given_date' => CRM_Utils_Date::isoToMysql($contribution['receive_date']),
+      'entity_id' => $contactID,
+      'start_date' => CRM_Utils_Date::isoToMysql($startDate),
+      'given_date' => CRM_Utils_Date::isoToMysql($givenDate),
       'address' => $addressDetails,
       'post_code' => $postCode,
       'eligible_for_gift_aid' => $contactGiftAidEligibleStatus,
@@ -222,7 +224,7 @@ class CRM_Civigiftaid_Declaration {
       'notes' => 'String',
     ];
 
-    if (CRM_Utils_Array::value('id', $params)) {
+    if (isset($params['id'])) {
       // We will update an existing record.
       $keyVals = [];
       $queryParams[1] = [$params['id'], 'Integer'];
@@ -231,7 +233,7 @@ class CRM_Civigiftaid_Declaration {
         if (isset($params[$colName])) {
           $keyVals[] = "{$colName}=%{$count}";
           $queryParams[$count] = [
-            CRM_Utils_Array::value($colName, $params, ''),
+            $params[$colName] ?? '',
             $colType
           ];
         }
@@ -249,10 +251,10 @@ class CRM_Civigiftaid_Declaration {
       }
       $count = 1;
       foreach ($cols as $colName => $colType) {
-        $insertVals[$colName] = CRM_Utils_Array::value($colName, $params, '');
+        $insertVals[$colName] = $params[$colName] ?? '';
         $values[] = "%{$count}";
         $queryParams[$count] = [
-          CRM_Utils_Array::value($colName, $params, ''),
+          $params[$colName] ?? '',
           $colType
         ];
         $count++;
