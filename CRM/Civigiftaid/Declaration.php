@@ -210,7 +210,7 @@ class CRM_Civigiftaid_Declaration {
    *
    * @param array $params
    */
-  private static function insertDeclaration($params) {
+  public static function insertDeclaration($params) {
     $cols = [
       'entity_id' => 'Integer',
       'eligible_for_gift_aid' => 'Integer',
@@ -478,6 +478,9 @@ class CRM_Civigiftaid_Declaration {
    * @param int    $contactID - the Individual for whom we retrieve declaration
    * @param date   $date      - date for which we retrieve declaration (in ISO date format)
    *       - e.g. the date for which you would like to check if the contact has a valid declaration
+   *       - If you pass NULL it will look for a declaration with date = now.
+   *       - If you pass '' it will look for any declaration matching the contact ID.
+   *       - The first declaration it finds will always be returned.
    *
    * @return array            - declaration record as associative array, else empty array.
    */
@@ -495,10 +498,13 @@ class CRM_Civigiftaid_Declaration {
     // Note that a record with an end_date will be chosen over one with a NULL
     // end_date, since ORDER BY end_date DESC will put NULL values last.
     $currentDeclaration = [];
+    if (!empty($date)) {
+      $dateClause = "AND start_date <= %2 AND (end_date > %2 OR end_date IS NULL)";
+    }
     $sql = "
         SELECT id, entity_id, eligible_for_gift_aid, start_date, end_date, reason_ended, source, notes, address, post_code
         FROM   civicrm_value_gift_aid_declaration
-        WHERE  entity_id = %1 AND start_date <= %2 AND (end_date > %2 OR end_date IS NULL)
+        WHERE  entity_id = %1 {$dateClause}
         ORDER BY end_date DESC";
     $sqlParams = [
       1 => [$contactID, 'Integer'],

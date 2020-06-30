@@ -17,11 +17,6 @@ function _civicrm_api3_gift_aid_updateeligiblecontributions_spec(&$params) {
   $params['contribution_id']['description'] = 'Optional contribution ID to update';
   $params['contribution_id']['type'] = CRM_Utils_Type::T_INT;
   $params['contribution_id']['api.required'] = FALSE;
-  $params['limit'] = [
-    'type' => CRM_Utils_Type::T_INT,
-    'title' => ts('Limit number to process in one go'),
-    'description' => 'If there are a lot of contributions this can be quite intensive. Optionally limit the number to process in a batch and run this API call multiple times',
-  ];
   $params['recalculate_amount']['title'] = 'Recalculate amounts';
   $params['recalculate_amount']['description'] = 'Recalculate Gift Aid amounts even if they already have the eligible flag set. This will not touch contributions already in a batch.';
   $params['recalculate_amount']['type'] = CRM_Utils_Type::T_BOOLEAN;
@@ -35,9 +30,10 @@ function _civicrm_api3_gift_aid_updateeligiblecontributions_spec(&$params) {
  * @throws \CiviCRM_API3_Exception
  */
 function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
-
   $customBatchName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid');
   $customEligible = CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid');
+
+  $params['options']['limit'] = $params['options']['limit'] ?? 0;
 
   $contributionParams = [
     'return' => [
@@ -48,7 +44,7 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
       $customBatchName,
       $customEligible,
     ],
-    'options' => ['limit' => $params['limit'] ?? 0],
+    'options' => $params['options'],
   ];
   if (empty($params['recalculate_amount'])) {
     // Only retrieve contributions that do not have eligibility set
@@ -77,4 +73,104 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   }
 
   return civicrm_api3_create_success($updatedIDs ?? [], $params, 'GiftAid', 'updateeligiblecontributions');
+}
+
+function _civicrm_api3_gift_aid_updatedeclarations_spec(&$params) {
+  $params['contact_id']['title'] = 'Contact ID';
+  $params['start_date']['title'] = 'Declaration start date';
+  $params['start_date']['description'] = 'Start date - if not set defaults to existing date or contact created_date';
+  $params['given_date']['title'] = 'Declaration given date';
+  $params['given_date']['description'] = 'Given date - if not set defaults to existing date or start_date or contact created_date';
+  $params['source']['title'] = 'Source text';
+  $params['source']['description'] = 'Source text if existing declaration source text is empty.';
+  $params['has_start_date']['title'] = 'Existing declaration has start date?';
+  $params['has_start_date']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['has_start_date']['description'] = 'Choose whether to update declarations which have/have not a start_date set';
+  $params['has_start_date']['api.default'] = FALSE;
+}
+
+function civicrm_api3_gift_aid_updatedeclarations($params) {
+  if (empty($params['contact_id'])) {
+    $contacts = civicrm_api3('Contact', 'get', [
+      'return' => ["id"],
+      'contact_type' => "Individual",
+      'options' => $params['options'] ?? [],
+      'is_deleted' => 0,
+    ])['values'];
+    $contactIDs = array_column($contacts, 'id');
+  }
+  elseif (isset($params['contact_id']['IN'])) {
+    $contactIDs = $params['contact_id']['IN'];
+  }
+  else {
+    $contactIDs[] = $params['contact_id'];
+  }
+
+  $startDate = '';
+  if (isset($params['start_date'])) {
+    $startDate = $params['start_date'];
+  }
+  if (isset($params['given_date'])) {
+    $givenDate = $params['given_date'];
+  }
+
+  foreach ($contactIDs as $contactID) {
+    list($addressDetails, $postCode) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($contactID);
+
+    $currentDeclaration = CRM_Civigiftaid_Declaration::getDeclaration($contactID, '');
+    if (empty($currentDeclaration)) {
+      $updated['contactIDNoDeclaration'][] = $contactID;
+      continue;
+    }
+
+    // Check if we should update declaration based api param if it has a start date
+    if (empty($currentDeclaration['start_date'])) {
+      if ($params['has_start_date']) {
+        // Current declaration has no start date but we require one
+        $updated['contactIDSkippedNoStartDate'][] = $contactID;
+        continue;
+      }
+    }
+    elseif (!empty($currentDeclaration['start_date'])) {
+      if (!$params['has_start_date']) {
+        // Current declaration has a start date and we are only updating ones that don't
+        $updated['contactIDSkippedHasStartDate'][] = $contactID;
+        continue;
+      }
+    }
+
+    if (!empty($currentDeclaration['given_date'])) {
+      $givenDate = $currentDeclaration['given_date'];
+    }
+    if (!empty($currentDeclaration['start_date'])) {
+      $startDate = $currentDeclaration['start_date'];
+    }
+    elseif (empty($currentDeclaration['start_date']) && empty($startDate)) {
+      // Set start date to contact create date
+      $startDate = civicrm_api3('Contact', 'getvalue', [
+        'id' => $contactID,
+        'return' => 'created_date'
+      ]);
+    }
+    if (empty($givenDate)) {
+      $givenDate = $startDate;
+    }
+
+    $declarationParams = [
+      'id' => $currentDeclaration['id'],
+      'entity_id' => $contactID,
+      'start_date' => CRM_Utils_Date::isoToMysql($startDate),
+      'given_date' => CRM_Utils_Date::isoToMysql($givenDate),
+      'address' => $addressDetails,
+      'post_code' => $postCode,
+    ];
+    if (empty($currentDeclaration['source']) && isset($params['source'])) {
+      $declarationParams['source'] = $params['source'];
+    }
+    CRM_Civigiftaid_Declaration::insertDeclaration($declarationParams);
+
+    $updated['contactIDs'][] = $contactID;
+  }
+
+  return civicrm_api3_create_success($updated, $params, 'GiftAid', 'Updatedeclarations');
 }
