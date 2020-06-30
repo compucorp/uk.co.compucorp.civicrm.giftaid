@@ -1,3 +1,7 @@
+## Release 3.4.1 - not yet released
+
+* Add GiftAid.Updatedeclarations API
+
 ## Release 3.4
 This release adds unit tests, fixes multiple issues, improves documentation and adds a field "Given Date" to the declaration.
 
