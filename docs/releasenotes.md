@@ -1,3 +1,10 @@
+## Release 3.4.1
+
+* Add GiftAid.Updatedeclarations API
+* Use title that user entered when adding to batch
+* Disable logging when fixing declarations/contributions via API
+* Fix crash with disable then enable extension
+
 ## Release 3.4
 This release adds unit tests, fixes multiple issues, improves documentation and adds a field "Given Date" to the declaration.
 

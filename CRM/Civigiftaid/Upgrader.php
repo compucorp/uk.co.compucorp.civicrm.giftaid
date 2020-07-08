@@ -454,6 +454,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   public function enable() {
     $this->setOptionGroups();
     $this->enableOptionGroups(1);
+    $this->ensureCustomGroups();
     $this->ensureCustomFields();
   }
 

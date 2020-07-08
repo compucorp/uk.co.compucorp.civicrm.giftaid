@@ -34,12 +34,15 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
 
   public function preProcess() {
     parent::preProcess();
+
+    // Generate Gift Aid batch name/title
     $this->batchTitle = 'GiftAid ' . CRM_Batch_BAO_Batch::generateBatchName();
     $this->batchName = CRM_Utils_String::titleToVar($this->batchTitle, 63);
 
     if ($this->isSubmitted()) {
       return;
     }
+
     list($totalContributionCount, $addedContributionIDs, $alreadyAddedContributionIDs, $notValidContributionIDs)
       = CRM_Civigiftaid_Utils_Contribution::validateContributionToBatch($this->_contributionIds);
     $session = new CRM_Core_Session();
@@ -90,6 +93,12 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
 
   public function postProcess() {
     $batchParams = [];
+
+    // Get submitted Gift Aid batch title
+    if (isset($this->_submitValues['title'])) {
+      $this->batchTitle = $this->_submitValues['title'];
+    }
+
     if (empty($this->batchTitle)) {
       CRM_Core_Error::statusBounce('Missing name for new GiftAid batch - try creating the batch again?', NULL, 'GiftAid - Add to Batch');
     }
