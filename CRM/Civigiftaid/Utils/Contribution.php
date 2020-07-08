@@ -685,20 +685,15 @@ class CRM_Civigiftaid_Utils_Contribution {
       return FALSE;
     }
 
+    // If contribution is marked as not eligible for gift-aid it is not eligible..
+    if (!(bool) $contribution[CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid')]) {
+      // Contribution marked as not eligible
+      return FALSE;
+    }
+
     $eligibleAmount = $contribution[CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid')];
     if (!empty($eligibleAmount) && ($eligibleAmount == 0)) {
       // Contribution has 0 eligible amount.
-      return FALSE;
-    }
-    // @todo fix this code it does nothing.
-    $isEligible = $contribution[CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid')];
-    if (!empty($isEligible) && ($isEligible == 0)) {
-      // Contribution marked as not eligible
-      return FALSE;
-    };
-    // If it is not set ('') it's not the same as DECLARATION_IS_NO
-    // This does nothing; $contributionEligible is not defined anywhere. @todo
-    if (!empty($contributionEligible) && ($contributionEligible == CRM_Civigiftaid_Declaration::DECLARATION_IS_NO)) {
       return FALSE;
     }
 
