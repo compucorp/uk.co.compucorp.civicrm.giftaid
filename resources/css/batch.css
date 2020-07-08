@@ -98,26 +98,8 @@
   border-width: 0;
 }
 
-#crm-container .gift-aid .contribution > td:first-child::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  margin-right: 5px;
-  display: inline-block;
-  background: url("/sites/all/modules/civicrm/i/icons/jquery-ui-3E3E3E.png") no-repeat -68px -20px;
-}
-
-#crm-container .gift-aid .contribution.collapsed > td:first-child::before {
-  background-position: -37px -20px;
-}
-
 #crm-container .gift-aid .contribution a:hover {
   text-decoration: underline;
-}
-
-#crm-container .gift-aid .line-items-container > td {
-  padding: 0;
-  border: none;
 }
 
 #crm-container .gift-aid .line-items {

@@ -46,11 +46,6 @@
                             <td>{$row.receive_date}</td>
                             <td>{$row.batch}</td>
                         </tr>
-                        <tr class="line-items-container">
-                            <td colspan="8">
-                                {include file="CRM/Civigiftaid/Form/Task/LineItems.tpl" contributionId=$row.contribution_id}
-                            </td>
-                        </tr>
                     {/foreach}
                 </table>
             </div>
@@ -93,11 +88,6 @@
                             <td>{$row.receive_date}</td>
                             <td>{$row.batch}</td>
                         </tr>
-                        <tr class="line-items-container">
-                            <td colspan="8">
-                                {include file="CRM/Civigiftaid/Form/Task/LineItems.tpl" contributionId=$row.contribution_id}
-                            </td>
-                        </tr>
                     {/foreach}
                 </table>
             </div>
@@ -138,11 +128,6 @@
                             <td>{$row.financial_account}</td>
                             <td>{$row.source}</td>
                             <td>{$row.receive_date}</td>
-                        </tr>
-                        <tr class="line-items-container">
-                            <td colspan="7">
-                                {include file="CRM/Civigiftaid/Form/Task/LineItems.tpl" contributionId=$row.contribution_id}
-                            </td>
                         </tr>
                     {/foreach}
                 </table>
