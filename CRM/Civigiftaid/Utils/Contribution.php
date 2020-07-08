@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use CRM_Civigiftaid_ExtensionUtil as E;
+
 /**
  * Class CRM_Civigiftaid_Utils_Contribution
  */
@@ -517,12 +519,20 @@ class CRM_Civigiftaid_Utils_Contribution {
       $contributionDetails[$dao->id]['batch'] = $dao->title;
       $contributionDetails[$dao->id]['batch_id'] = $dao->batch_id;
       $contributionDetails[$dao->id]['line_items_count'] = 0;
+
+      CRM_Utils_System::url('civicrm/contact/view/contribution', 'reset=1&&action=view&id=255&cid=202');
+      $contributionDetails[$dao->id]['actions'] = self::getActionLinks($dao->contact_id, $dao->id);
     }
 
     if (count($contributionDetails)) {
       $contributionDetails = self::countLineItems($contributionIdStr, $contributionDetails);
     }
     return $contributionDetails;
+  }
+
+  private static function getActionLinks($contactID, $contributionID) {
+    $viewURL = CRM_Utils_System::url('civicrm/contact/view/contribution', "reset=1&&action=view&id={$contributionID}&cid={$contactID}");
+    return "<a href='{$viewURL}' class='crm-popup'>" . E::ts('View') . "</a>";
   }
 
   /**
