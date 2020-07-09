@@ -107,8 +107,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'weight'               => 2,
       ]
     )['id'];
-
-
   }
   /**
    * Ensure we have the custom fields defined for declaration

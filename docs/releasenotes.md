@@ -1,3 +1,9 @@
+## Release 3.4.2
+
+* Fix [#4](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/4) - Individual donation marked as "NO" from backend, gets included in batch.
+* Remove unused lineitems display from add/remove to batch.
+* Add 'View' action to contributions on add/remove batch list.
+
 ## Release 3.4.1
 
 * Add GiftAid.Updatedeclarations API

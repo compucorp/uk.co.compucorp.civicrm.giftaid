@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use CRM_Civigiftaid_ExtensionUtil as E;
+
 /**
  * Class CRM_Civigiftaid_Utils_Contribution
  */
@@ -517,12 +519,20 @@ class CRM_Civigiftaid_Utils_Contribution {
       $contributionDetails[$dao->id]['batch'] = $dao->title;
       $contributionDetails[$dao->id]['batch_id'] = $dao->batch_id;
       $contributionDetails[$dao->id]['line_items_count'] = 0;
+
+      CRM_Utils_System::url('civicrm/contact/view/contribution', 'reset=1&&action=view&id=255&cid=202');
+      $contributionDetails[$dao->id]['actions'] = self::getActionLinks($dao->contact_id, $dao->id);
     }
 
     if (count($contributionDetails)) {
       $contributionDetails = self::countLineItems($contributionIdStr, $contributionDetails);
     }
     return $contributionDetails;
+  }
+
+  private static function getActionLinks($contactID, $contributionID) {
+    $viewURL = CRM_Utils_System::url('civicrm/contact/view/contribution', "reset=1&&action=view&id={$contributionID}&cid={$contactID}");
+    return "<a href='{$viewURL}' class='crm-popup'>" . E::ts('View') . "</a>";
   }
 
   /**
@@ -675,20 +685,15 @@ class CRM_Civigiftaid_Utils_Contribution {
       return FALSE;
     }
 
+    // If contribution is marked as not eligible for gift-aid it is not eligible..
+    if (!(bool) $contribution[CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid')]) {
+      // Contribution marked as not eligible
+      return FALSE;
+    }
+
     $eligibleAmount = $contribution[CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid')];
     if (!empty($eligibleAmount) && ($eligibleAmount == 0)) {
       // Contribution has 0 eligible amount.
-      return FALSE;
-    }
-    // @todo fix this code it does nothing.
-    $isEligible = $contribution[CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid')];
-    if (!empty($isEligible) && ($isEligible == 0)) {
-      // Contribution marked as not eligible
-      return FALSE;
-    };
-    // If it is not set ('') it's not the same as DECLARATION_IS_NO
-    // This does nothing; $contributionEligible is not defined anywhere. @todo
-    if (!empty($contributionEligible) && ($contributionEligible == CRM_Civigiftaid_Declaration::DECLARATION_IS_NO)) {
       return FALSE;
     }
 
