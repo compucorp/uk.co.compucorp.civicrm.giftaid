@@ -26,4 +26,5 @@ nav:
 - "Submitting to HMRC / Reporting": submission.md
 - "Managing the basic rate of Tax": tax.md
 - "API Functions": api.md
+- "Reference": reference/index.md
 
