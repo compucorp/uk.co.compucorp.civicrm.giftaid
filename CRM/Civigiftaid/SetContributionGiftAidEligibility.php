@@ -104,10 +104,18 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
         // Assume not eligible until proven eligible.
         $eligibility = 0;
         // We need to look through line items to determine if any of them are eligible.
-        foreach ($contribution['line_items'] as $lineItem) {
-          if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
+        if (empty($contribution['line_items'])) {
+          // Issue #9: Sometimes line_itmes are not returned!
+          if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
             $eligibility = 1;
-            break;
+          }
+        }
+        else {
+          foreach ($contribution['line_items'] as $lineItem) {
+            if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
+              $eligibility = 1;
+              break;
+            }
           }
         }
       }
