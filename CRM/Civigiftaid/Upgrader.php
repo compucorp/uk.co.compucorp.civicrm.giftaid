@@ -601,6 +601,12 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3111() {
+    $this->log('Check we have batch_type = "Gift Aid".');
+    $this->ensureDataStructures();
+    return TRUE;
+  }
+
   /**
    * @return array
    */
@@ -921,6 +927,9 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'is_reserved' => 1
       ],
     ];
+    $optionGroups['batch_type'] = civicrm_api3('OptionGroup', 'getsingle', [
+      'name' => 'batch_type',
+    ]);
     return $optionGroups;
   }
 
@@ -1002,6 +1011,13 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'is_reserved' => 1,
         'description' => 'The GiftAid basic tax rate (%)'
       ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['batch_type'],
+        'name' => "Gift Aid",
+        'is_active' => 1,
+        'is_reserved' => 1,
+        'is_default' => 0,
+      ]
     ];
 
     return $optionValues;

@@ -33,20 +33,9 @@ class CRM_Civigiftaid_Utils_Contribution {
 
     // Get the batch name
     $batchName = civicrm_api3('Batch', 'getvalue', [
-      'return' => "title",
+      'return' => 'name',
       'id' => $batchID,
     ]);
-
-    $batchNameGroup = civicrm_api3('OptionGroup', 'getsingle', ['name' => 'giftaid_batch_name']);
-    if ($batchNameGroup['id']) {
-      $groupId = $batchNameGroup['id'];
-      $params = [
-        'option_group_id' => $groupId,
-        'value'           => $batchName,
-        'label'           => $batchName
-      ];
-      civicrm_api3('OptionValue', 'create', $params);
-    }
 
     // Get all contributions from found IDs that are not already in a batch
     $contributionParams = [
