@@ -73,11 +73,12 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
           'contribution_id' => [
             'name' => 'id',
             'title' => ts('Contribution ID'),
-            'required' => TRUE,
+            'required' => FALSE,
           ],
           'contact_id' => [
             'name' => 'contact_id',
             'title' => ts('Donor Name'),
+            'no_display' => TRUE,
             'required' => TRUE,
           ],
           'receive_date' => [
@@ -90,6 +91,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
             'name' => 'total_amount',
             'title' => ts('Donation Amount'),
             'type' => CRM_Utils_Type::T_INT,
+            'no_display' => TRUE,
             'required' => TRUE,
           ]
         ],
@@ -101,7 +103,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
           'street_address'    => [
             'name'       => 'street_address',
             'title'      => ts('Street Address'),
-            'no_display' => FALSE,
+            'no_display' => TRUE,
             'required'   => TRUE,
           ],
           'postal_code'       => [
@@ -196,6 +198,18 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
     $this->_columnHeaders['civicrm_address_house_number'] = [
       'title' => 'House name or number',
     ];
+    
+/**
+ * HMRC Gift Aid spreadsheet requires columns for Aggregated Donations and Sponsored Events.
+ * Normally blank, these are included here so the CiviCRM csv file matches the HMRC format.
+ */
+    $this->_columnHeaders['aggregated_donations'] = [
+      'title' => 'Aggregated Donations',
+    ];
+    $this->_columnHeaders['sponsored_event'] = [
+      'title' => 'Sponsored Event',
+    ];
+
 
     $this->reorderColumns();
 
@@ -346,6 +360,8 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
       'city',
       'county',
       'postcode',
+      'aggregated donations',
+      'sponsored event',
       'country',
       'donation date',
       'amount',
