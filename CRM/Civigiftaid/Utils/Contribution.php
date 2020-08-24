@@ -391,17 +391,15 @@ class CRM_Civigiftaid_Utils_Contribution {
   /**
    * Returns the array of batchID & title
    *
-   * @param string $orderBy
-   *
    * @return array
    */
-  public static function getBatchIdTitle($orderBy = 'id') {
-    $query = "SELECT * FROM civicrm_batch ORDER BY " . $orderBy;
+  public static function getBatchIdTitle() {
+    $query = "SELECT * FROM civicrm_batch ORDER BY id DESC";
     $dao = CRM_Core_DAO::executeQuery($query);
 
     $result = [];
     while ($dao->fetch()) {
-      $result[$dao->id] = $dao->id . " - " . $dao->title;
+      $result[$dao->id] = $dao->title;
     }
     return $result;
   }

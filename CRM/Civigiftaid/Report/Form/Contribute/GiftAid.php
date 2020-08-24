@@ -31,7 +31,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
           'batch_id' => [
             'title'        => ts('Batch'),
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
-            'options'      => CRM_Civigiftaid_Utils_Contribution::getBatchIdTitle('id desc'),
+            'options'      => CRM_Civigiftaid_Utils_Contribution::getBatchIdTitle(),
             'type' => CRM_Utils_Type::T_INT,
           ],
         ],
@@ -127,6 +127,10 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
           $this->_columns['civicrm_value_gift_aid_submission']['fields'][$field]['type'] = CRM_Utils_Type::T_INT;
         }
       }
+      // Remove the Gift Aid Batch name filter - it doesn't work and we have batch_id via civicrm_entity_batch which does
+      if (isset($this->_columns['civicrm_value_gift_aid_submission']['filters'][CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')])) {
+        unset($this->_columns['civicrm_value_gift_aid_submission']['filters'][CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')]);
+      }
     }
   }
 
@@ -198,7 +202,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
     $this->_columnHeaders['civicrm_address_house_number'] = [
       'title' => 'House name or number',
     ];
-    
+
 /**
  * HMRC Gift Aid spreadsheet requires columns for Aggregated Donations and Sponsored Events.
  * Normally blank, these are included here so the CiviCRM csv file matches the HMRC format.
