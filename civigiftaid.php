@@ -15,8 +15,13 @@ function civigiftaid_civicrm_config(&$config) {
   if (isset(Civi::$statics[__FUNCTION__])) { return; }
   Civi::$statics[__FUNCTION__] = 1;
 
+  // Symfony hook priorities - see https://docs.civicrm.org/dev/en/latest/hooks/usage/symfony/#priorities
   // Add listeners for CiviCRM hooks that might need altering by other scripts
   Civi::dispatcher()->addListener('hook_civicrm_post', 'CRM_Civigiftaid_SetContributionGiftAidEligibility::run');
+
+  // Run before giftaidonline (-100)
+  \Civi::dispatcher()->addListener('hook_civicrm_navigationMenu', 'civigiftaid_symfony_civicrm_navigationMenu', 0);
+
 }
 
 /**
@@ -98,11 +103,12 @@ function civigiftaid_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
 /**
  * Add navigation for GiftAid under "Administer/CiviContribute" menu
  *
- * @param array $menu
+ * @param \Civi\Core\Event\GenericHookEvent $event
+ * @param string $hookName
  *
  * @throws \CiviCRM_API3_Exception
  */
-function civigiftaid_civicrm_navigationMenu(&$menu) {
+function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
   // Get optionvalue ID for basic rate tax setting
   $result = civicrm_api3('OptionValue', 'getsingle', ['name' => 'basic_rate_tax']);
   if ($result['id']) {
@@ -118,7 +124,7 @@ function civigiftaid_civicrm_navigationMenu(&$menu) {
     'operator'   => NULL,
     'separator'  => 1,
   ];
-  _civigiftaid_civix_insert_navigation_menu($menu, 'Administer/CiviContribute', $item[0]);
+  _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute', $item[0]);
 
   $item[] = [
     'label' => E::ts('GiftAid Basic Rate Tax'),
@@ -128,7 +134,7 @@ function civigiftaid_civicrm_navigationMenu(&$menu) {
     'operator'   => NULL,
     'separator'  => NULL,
   ];
-  _civigiftaid_civix_insert_navigation_menu($menu, 'Administer/CiviContribute/admin_giftaid', $item[1]);
+  _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute/admin_giftaid', $item[1]);
 
   $item[] = [
     'label'      => E::ts('Settings'),
@@ -138,9 +144,9 @@ function civigiftaid_civicrm_navigationMenu(&$menu) {
     'operator'   => NULL,
     'separator'  => NULL,
   ];
-  _civigiftaid_civix_insert_navigation_menu($menu, 'Administer/CiviContribute/admin_giftaid', $item[2]);
+  _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute/admin_giftaid', $item[2]);
 
-  _civigiftaid_civix_navigationMenu($menu);
+  _civigiftaid_civix_navigationMenu($event->params);
 }
 
 /**
