@@ -323,7 +323,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
 
 
       if (array_key_exists('civicrm_address_street_address', $row)) {
-        $address = CRM_Civigiftaid_Declaration::getDonorAddress($row['civicrm_contribution_contact_id'], CRM_Utils_Date::isoToMysql($row['civicrm_contribution_receive_date']));
+        $address = CRM_Civigiftaid_Declaration::getDonorAddress($row['civicrm_contribution_contact_id'], date('Ymd', strtotime($row['civicrm_contribution_receive_date'])) . '235959');
         $rows[$rowNum]['civicrm_address_house_number'] = $address['house_number'];
         $rows[$rowNum]['civicrm_address_street_address']
           = $address['address'];
