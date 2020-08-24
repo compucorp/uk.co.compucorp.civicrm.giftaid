@@ -20,6 +20,15 @@ Note that a contribution's eligibility is based on the financial types of the li
    - If missing/false (default), only calculate amounts (and eligibility) for contributions that do not have eligibility known.
    - If true, recalculate Gift Aid amounts (but not eligibility) for contributions that have the eligible flag set.
 
+### Recalculate Contribution Amounts
+GiftAid.recalculatecontributionamounts - API to recalculate gift aid amounts for contributions.
+
+This is also done by updateeligiblecontributions but there are two main differences:
+1. The eligibility status is not changed.
+2. If you specify a batch name as parameter the amounts will be recalculated for all contributions with that batch name.
+
+- `batch_name` (string): The batch name (note that you see the label in the UI but you need the name which you can find from the `gift_aid_batch_name` option group).
+
 ### Update Declarations
 GiftAid.updatedeclarations - API to update existing declarations that may be invalid (eg. were imported, missing address etc.).
 
