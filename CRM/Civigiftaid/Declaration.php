@@ -651,14 +651,16 @@ SQL;
   }
 
   /**
-   * split the phrase by any number of commas or space characters,
+   * split the phrase to break after the house name (including spaces), or
+   * number (including a following letter, e.g. "221b")
    * which include " ", \r, \t, \n and \f
    * @param string $p_address_line
    *
    * @return string|null
    */
   private static function getHouseNo($p_address_line) {
-    $aAddress = preg_split("/[,\s]+/", $p_address_line);
+ 	preg_match('/^([a-zA-Z\s]+[0-9]*)|^([0-9]*[a-zA-Z]?)/',$p_address_line,$aAddress);
+    $aAddress = array_values(array_filter($aAddress));
     if (empty($aAddress)) {
       return NULL;
     } else {
