@@ -238,23 +238,53 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
  * @throws \CiviCRM_API3_Exception
  */
 function civigiftaid_civicrm_post($op, $objectName, $objectId, &$objectRef) {
-  if ($objectName !== 'Contribution') {
-    return;
-  }
+  switch ($objectName) {
+    case 'Batch':
+      if ($op !== 'delete') {
+        return;
+      }
+      // We have the batch ID. Check if it's a giftaid batch and delete related stuff
+      try {
+        $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', [
+          'name' => 'giftaid_batch_name',
+          'return' => 'id'
+        ]);
+        $batchOptionValue = civicrm_api3('OptionValue', 'getsingle', [
+          'option_group_id' => $optionGroupID,
+          'value' => $objectId,
+        ]);
+        // Clear batch_name from contributions
+        $updateSql = "UPDATE civicrm_value_gift_aid_submission SET batch_name = NULL WHERE batch_name=%1";
+        $updateSqlParams = [
+          1 => [$batchOptionValue['name'], 'String']
+        ];
+        CRM_Core_DAO::executeQuery($updateSql, $updateSqlParams);
+        // Finally we delete the giftaid batch name option value.
+        civicrm_api3('OptionValue', 'delete', [
+          'id' => $batchOptionValue['id'],
+        ]);
+      } catch (Exception $e) {
+        \Civi::log()
+          ->error('Deleting Gift Aid Batch failed: ' . $e->getMessage());
+      }
+      break;
 
-  if ($op == 'edit' || $op == 'create') {
-    $callbackParams = [
-      'entity' => $objectName,
-      'op' => $op,
-      'id' => $objectId,
-      'details' => $objectRef,
-    ];
-    if (CRM_Core_Transaction::isActive()) {
-      CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT, 'civigiftaid_callback_civicrm_post_contribution', [$callbackParams]);
-    }
-    else {
-      civigiftaid_callback_civicrm_post_contribution($callbackParams);
-    }
+    case 'Contribution':
+      if ($op == 'edit' || $op == 'create') {
+        $callbackParams = [
+          'entity' => $objectName,
+          'op' => $op,
+          'id' => $objectId,
+          'details' => $objectRef,
+        ];
+        if (CRM_Core_Transaction::isActive()) {
+          CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT, 'civigiftaid_callback_civicrm_post_contribution', [$callbackParams]);
+        }
+        else {
+          civigiftaid_callback_civicrm_post_contribution($callbackParams);
+        }
+      }
+      break;
   }
 }
 
@@ -379,5 +409,31 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
 
   if (!empty($errors)) {
     return $errors;
+  }
+}
+
+/**
+ * This hook is called to alter Custom field value before its displayed.
+ *
+ * @param string $displayValue
+ * @param mixed $value
+ * @param int $entityId
+ * @param array $fieldInfo
+ */
+function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value, $entityId, $fieldInfo) {
+  // Gift Aid batch name is stored as "name" but we want to display "label".
+  if ($fieldInfo['name'] === 'Batch_Name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value)) {
+    try {
+      $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
+      $displayValue = civicrm_api3('OptionValue', 'getvalue', [
+        'option_group_id' => $optionGroupID,
+        'name' => $value,
+        'return' => 'label',
+      ]);
+    }
+    catch (Exception $e) {
+      // Do nothing, we'll use the existing displayValue
+      // This will fail for older batches which stored the label instead of the name for the batch_name field.
+    }
   }
 }
