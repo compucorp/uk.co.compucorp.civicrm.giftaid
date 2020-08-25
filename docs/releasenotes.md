@@ -9,6 +9,20 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.4.4
+**Requires CiviCRM 5.25 minimum or you won't see the batch name anymore in the contribution detail** - *alterCustomFieldDisplayValue hook does not exist.*
+
+* Replace deprecated hook definitions.
+* Remove deprecated trapException on executeQuery.
+* Switch "Add to Batch" to use API and supported batch params.
+* If deleting a batch clean up giftaid batch info so we don't have problems adding them to a new batch.
+* Add API to recalculate amounts for contributions already added to a batch (`GiftAid.recalculatecontributionamounts`).
+* Fix ukgiftaidonline menu items sometimes not showing: [ukgiftaidonline#1](https://lab.civicrm.org/extensions/ukgiftaidsubmission/-/issues/1).
+* Fix searching for batch via reports.
+* Improve GiftAid Report for submission to HMRC [!12](https://lab.civicrm.org/extensions/ukgiftaid/-/merge_requests/12)
+* Improve address validation for house names.
+* Fix get address for report when contribution receive date is a few seconds after declaration but on same day.
+
 ## Release 3.4.3
 
 * Fix [#9](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/4) Fix contributions marked not-eligible when line items missing

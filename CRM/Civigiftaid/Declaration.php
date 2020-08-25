@@ -630,21 +630,17 @@ SQL;
       2 => [$p_contribution_receive_date, 'Timestamp']
     ];
 
-    $oDao = CRM_Core_DAO::executeQuery( $sSql
-      , $aParams
-      , $abort         = TRUE
-      , $daoName       = NULL
-      , $freeDAO       = FALSE
-      , $i18nRewrite   = TRUE
-      , $trapException = TRUE /* This must be explicitly set to TRUE for the code below to handle any Exceptions */
-    );
-    if (!(is_a($oDao, 'DB_Error'))) {
+    try {
+      $oDao = CRM_Core_DAO::executeQuery($sSql, $aParams);
       if ($oDao->fetch()) {
-        $aAddress['id']       = $oDao->id;
-        $aAddress['address']  = $oDao->address;
+        $aAddress['id'] = $oDao->id;
+        $aAddress['address'] = $oDao->address;
         $aAddress['house_number'] = self::getHouseNo($oDao->address);
         $aAddress['postcode'] = self::getPostCode($oDao->postcode);
       }
+    }
+    catch (Exception $e) {
+      \Civi::log()->error('getDonorAddress error: ' . $e->getMessage());
     }
 
     return $aAddress;

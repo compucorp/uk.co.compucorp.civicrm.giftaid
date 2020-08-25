@@ -33,20 +33,9 @@ class CRM_Civigiftaid_Utils_Contribution {
 
     // Get the batch name
     $batchName = civicrm_api3('Batch', 'getvalue', [
-      'return' => "title",
+      'return' => 'name',
       'id' => $batchID,
     ]);
-
-    $batchNameGroup = civicrm_api3('OptionGroup', 'getsingle', ['name' => 'giftaid_batch_name']);
-    if ($batchNameGroup['id']) {
-      $groupId = $batchNameGroup['id'];
-      $params = [
-        'option_group_id' => $groupId,
-        'value'           => $batchName,
-        'label'           => $batchName
-      ];
-      civicrm_api3('OptionValue', 'create', $params);
-    }
 
     // Get all contributions from found IDs that are not already in a batch
     $contributionParams = [
@@ -109,13 +98,13 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param int $contributionID
    * @param int $eligibleForGiftAid - if this is NULL if will NOT be set, otherwise set it to eg CRM_Civigiftaid_Utils_GiftAid::DECLARATION_IS_YES
    * @param string $batchName - if this is set to NULL it will NOT be changed
-   * @param bool $addToBatch - You must set this to TRUE to modify the batchName
+   * @param bool $updateIfHasBatchName - You must set this to TRUE to modify the batchName
    *
    * @throws \CRM_Extension_Exception
    * @throws \CiviCRM_API3_Exception
    */
-  public static function updateGiftAidFields($contributionID, $eligibleForGiftAid = NULL, $batchName = '', $addToBatch = FALSE) {
-    if (!empty($batchName) && !$addToBatch) {
+  public static function updateGiftAidFields($contributionID, $eligibleForGiftAid = NULL, $batchName = '', $updateIfHasBatchName = FALSE) {
+    if (!empty($batchName) && !$updateIfHasBatchName) {
       // Don't touch this contribution - it's already part of a batch
       // and we're not being called to clear the batch (e.g. new contribution in a recurring contribution).
       return;
@@ -402,17 +391,15 @@ class CRM_Civigiftaid_Utils_Contribution {
   /**
    * Returns the array of batchID & title
    *
-   * @param string $orderBy
-   *
    * @return array
    */
-  public static function getBatchIdTitle($orderBy = 'id') {
-    $query = "SELECT * FROM civicrm_batch ORDER BY " . $orderBy;
+  public static function getBatchIdTitle() {
+    $query = "SELECT * FROM civicrm_batch ORDER BY id DESC";
     $dao = CRM_Core_DAO::executeQuery($query);
 
     $result = [];
     while ($dao->fetch()) {
-      $result[$dao->id] = $dao->id . " - " . $dao->title;
+      $result[$dao->id] = $dao->title;
     }
     return $result;
   }

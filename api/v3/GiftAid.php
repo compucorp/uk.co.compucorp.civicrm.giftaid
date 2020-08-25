@@ -92,6 +92,86 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   return civicrm_api3_create_success($updatedIDs ?? [], $params, 'GiftAid', 'updateeligiblecontributions');
 }
 
+/**
+ * @param array $params
+ */
+function _civicrm_api3_gift_aid_recalculatecontributionamounts_spec(&$params) {
+  $params['contribution_id']['title'] = 'Contribution ID';
+  $params['contribution_id']['description'] = 'Optional contribution ID to update';
+  $params['contribution_id']['type'] = CRM_Utils_Type::T_INT;
+  $params['contribution_id']['api.required'] = FALSE;
+  $params['batch_name']['title'] = 'The batch name (optional)';
+  $params['batch_name']['description'] = 'If specified, amounts will be recalculated for contributions with this batch name only. Otherwise only contributions with no batch name will be recalculated.';
+  $params['batch_name']['type'] = CRM_Utils_Type::T_STRING;
+}
+
+function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
+  $customBatchName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid');
+  $customEligible = CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid');
+
+  $params['options']['limit'] = $params['options']['limit'] ?? 0;
+
+  $contributionParams = [
+    'return' => [
+      'id',
+      'contact_id',
+      'contribution_status_id',
+      'receive_date',
+      $customBatchName,
+      $customEligible,
+    ],
+    'options' => $params['options'],
+  ];
+
+  // Retrieve all contributions that are eligible for gift aid
+  $contributionParams[$customEligible] = 1;
+
+  if (!empty($params['contribution_id'])) {
+    $contributionParams['id'] = $params['contribution_id'];
+  }
+  $contributions = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
+  if (empty($contributions)) {
+    return civicrm_api3_create_error('No contributions found or none have Eligible flag set!');
+  }
+
+  // Disable logging
+  $loggingSchema = new \CRM_Logging_Schema();
+  $loggingEnabled = $loggingSchema->isEnabled();
+  if ($loggingEnabled) {
+    $loggingSchema->disableLogging();
+    Civi::settings()->set('logging', '0');
+  }
+
+  try {
+    foreach ($contributions as $contributionID => $contributionDetail) {
+      // Check batch name here because it may be NULL or empty string and we can't check that using API3.
+      if (!empty($params['batch_name']) && ($params['batch_name'] !== $contributionDetail[$customBatchName])) {
+        // We specified a specific batch name to process and this contribution is not part of that batch
+        continue;
+      }
+      elseif (empty($params['batch_name']) && !empty($contributionDetail[$customBatchName])) {
+        // Contribution is part of a batch so we must not change/process it.
+        continue;
+      }
+      CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID,
+        $contributionDetail[$customEligible],
+        $contributionDetail[$customBatchName],
+        TRUE
+      );
+      $updatedIDs[] = $contributionID;
+    }
+  }
+  finally {
+    // Re-enable logging
+    if ($loggingEnabled) {
+      $loggingSchema->enableLogging();
+      Civi::settings()->set('logging', '1');
+    }
+  }
+
+  return civicrm_api3_create_success($updatedIDs ?? [], $params, 'GiftAid', 'recalculatecontributionamounts');
+}
+
 function _civicrm_api3_gift_aid_updatedeclarations_spec(&$params) {
   $params['contact_id']['title'] = 'Contact ID';
   $params['start_date']['title'] = 'Declaration start date';
