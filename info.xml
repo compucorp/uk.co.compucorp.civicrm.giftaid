@@ -10,7 +10,7 @@
     <url desc="Main Extension Page">https://lab.civicrm.org/extensions/ukgiftaid</url>
     <url desc="Documentation">https://docs.civicrm.org/ukgiftaid</url>
     <url desc="Support">https://lab.civicrm.org/extensions/ukgiftaid/issues</url>
-    <url desc="Release Notes">https://docs.civicrm.org/ukgiftaid/releasenotes</url>
+    <url desc="Release Notes">https://docs.civicrm.org/ukgiftaid/en/latest/releasenotes</url>
     <url desc="Licensing">http://civicrm.org/licensing</url>
   </urls>
   <license>AGPL</license>
