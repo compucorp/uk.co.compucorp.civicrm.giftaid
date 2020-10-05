@@ -9,6 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.4.5
+
+* Fix [#10](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/10) - issues with Gift Aid profile description and fields.
+
 ## Release 3.4.4
 **Requires CiviCRM 5.25 minimum or you won't see the batch name anymore in the contribution detail** - *alterCustomFieldDisplayValue hook does not exist.*
 
