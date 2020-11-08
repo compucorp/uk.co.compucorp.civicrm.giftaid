@@ -5,7 +5,7 @@
 You can use the `limit` and `offset` API3 options to control how many entities these APIs will process each run.
 
 ### Update Eligible Contributions
-GiftAid.updateeligiblecontributions - API to set "Eligible for Gift Aid" on all contributions where
+`GiftAid.updateeligiblecontributions` - API to set "Eligible for Gift Aid" on all contributions where
 it was not previously set.
 
 This allows to to "fix" any contributions that were created with an older version of the extension.
@@ -21,7 +21,7 @@ Note that a contribution's eligibility is based on the financial types of the li
    - If true, recalculate Gift Aid amounts (but not eligibility) for contributions that have the eligible flag set.
 
 ### Recalculate Contribution Amounts
-GiftAid.recalculatecontributionamounts - API to recalculate gift aid amounts for contributions.
+`GiftAid.recalculatecontributionamounts` - API to recalculate gift aid amounts for contributions.
 
 This is also done by updateeligiblecontributions but there are two main differences:
 1. The eligibility status is not changed.
@@ -30,7 +30,7 @@ This is also done by updateeligiblecontributions but there are two main differen
 - `batch_name` (string): The batch name (note that you see the label in the UI but you need the name which you can find from the `gift_aid_batch_name` option group).
 
 ### Update Declarations
-GiftAid.updatedeclarations - API to update existing declarations that may be invalid (eg. were imported, missing address etc.).
+`GiftAid.updatedeclarations` - API to update existing declarations that may be invalid (eg. were imported, missing address etc.).
 
 !! note
     This API only updates the first declaration for a contact
@@ -41,3 +41,10 @@ GiftAid.updatedeclarations - API to update existing declarations that may be inv
 - `given_date` (string): Declaration given date - if not set defaults to existing date or start_date or contact created_date.
 - `source` (string): Source text if existing declaration source text is empty.
 - `has_start_date` (bool): Existing declaration has start date? Choose whether to update declarations which have/have not a start_date set. This is useful for updating ones with a start_date differently to ones without (eg. adding different source text).
+
+### Ensure Data Structures
+**WARNING: This will make changes to custom fields, option groups, profiles without asking and may lead to data loss! Always run on a test site first**.
+
+`GiftAid.Ensuredatastructures` - API to validate and update data structures (custom fields, option groups, profiles) required by the GiftAid extension.
+
+This should be done automatically by the extension upgrader but if necessary you can use this API to do so.

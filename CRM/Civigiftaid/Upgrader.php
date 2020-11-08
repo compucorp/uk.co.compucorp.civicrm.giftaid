@@ -38,7 +38,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   /**
    */
   public function install() {
-
     $this->ensureDataStructures();
 
     // Nb. this is kept to preserve previous behaviour, it should not be needed.
@@ -64,7 +63,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     $this->ensureCustomFields();
     $this->setDefaultSettings();
     $this->ensureProfiles();
-
   }
   /**
    * Ensure we have the custom groups defined.

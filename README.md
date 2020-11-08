@@ -7,13 +7,8 @@ The extension is licensed under [AGPL-3.0](LICENSE.txt).
 ## Requirements
 
 * PHP v7.2+
-* CiviCRM 5.24+
+* CiviCRM 5.28+
 
 ## Installation
 
-See: https://docs.civicrm.org/sysadmin/en/latest/customize/extensions/#installing-a-new-extension
-
-### Support
-Documentation: [docs/index.md](/docs/index.md)
-
-For online submission directly to HMRC see https://lab.civicrm.org/extensions/ukgiftaidsubmission
+Documentation is available [here](https://docs.civicrm.org/ukgiftaid).

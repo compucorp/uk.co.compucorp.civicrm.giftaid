@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use CRM_Civigiftaid_ExtensionUtil as E;
+
 /**
  * @param array $params
  */
@@ -287,4 +289,10 @@ function civicrm_api3_gift_aid_updatedeclarations($params) {
   }
 
   return civicrm_api3_create_success($updated, $params, 'GiftAid', 'Updatedeclarations');
+}
+
+function civicrm_api3_gift_aid_ensuredatastructures($params) {
+  $upgrader = new CRM_Civigiftaid_Upgrader(E::LONG_NAME, E::path());
+  $upgrader->ensureDataStructures();
+  return civicrm_api3_create_success([], $params, 'GiftAid', 'Ensuredatastructures');
 }

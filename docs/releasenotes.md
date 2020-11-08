@@ -9,6 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.4.6 (not yet released 2020-11-08)
+
+* Add `GiftAid.Ensuredatastructures` API.
+
 ## Release 3.4.5
 
 * Fix [#10](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/10) - issues with Gift Aid profile description and fields.
