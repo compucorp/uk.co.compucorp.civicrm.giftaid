@@ -279,8 +279,32 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
     return $statistics;
   }
 
+  /**
+   * Post process function.
+   */
   public function postProcess() {
-    parent::postProcess();
+    // get ready with post process params
+    $this->beginPostProcess();
+
+    // build query
+    $sql = $this->buildQuery();
+
+    // build array of result based on column headers. This method also allows
+    // modifying column headers before using it to build result set i.e $rows.
+    $rows = [];
+    $this->buildRows($sql, $rows);
+
+    $this->assign('statistics', $this->statistics($rows));
+
+    // format result set.
+    $this->formatDisplay($rows);
+
+    // assign variables to templates
+    $this->assign_by_ref('columnHeaders', $this->_columnHeaders);
+    $this->assign_by_ref('rows', $rows);
+
+    // do print / pdf / instance stuff if needed
+    $this->endPostProcess($rows);
   }
 
   /**
