@@ -173,18 +173,6 @@ function civigiftaid_civicrm_searchTasks($objectType, &$tasks) {
  */
 function civigiftaid_civicrm_buildForm($formName, &$form) {
   switch ($formName) {
-    case 'CRM_Civigiftaid_Form_Settings':
-      CRM_Core_Resources::singleton()
-        ->addScriptFile(E::LONG_NAME, 'resources/js/settings.js', 1, 'html-header');
-      break;
-
-    case 'CRM_Civigiftaid_Form_Task_AddToBatch':
-    case 'CRM_Civigiftaid_Form_Task_RemoveFromBatch':
-    CRM_Core_Resources::singleton()
-      ->addScriptFile(E::LONG_NAME, 'resources/js/batch.js', 1, 'html-header')
-      ->addStyleFile(E::LONG_NAME, 'resources/css/batch.css', 1, 'html-header');
-      break;
-
     case 'CRM_Admin_Form_Generic':
       if ($form->getSettingPageFilter() !== 'ukgiftaid') {
         return;
