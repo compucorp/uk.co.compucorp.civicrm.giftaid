@@ -90,7 +90,14 @@ class CRM_Civigiftaid_Declaration {
     ])['values'];
     if (!empty($address)) {
       $address = reset($address);
-      $postalCode = $address['postal_code'] ?? '';
+      // 1226 = United Kingdom
+      if (!empty($address['country_id']) && ((int)$address['country_id'] !== 1226)) {
+        // "Overseas" address
+        $postalCode = 'X';
+      }
+      else {
+        $postalCode = $address['postal_code'] ?? '';
+      }
       $fullFormattedAddress = self::getFormattedAddress($address);
     }
 
@@ -289,7 +296,6 @@ class CRM_Civigiftaid_Declaration {
    * @return array
    */
   public static function getContactsWithDeclarations() {
-    $contactsWithDeclarations = [];
     $sql = "
         SELECT   entity_id
         FROM     civicrm_value_gift_aid_declaration
@@ -587,36 +593,49 @@ class CRM_Civigiftaid_Declaration {
   }
 
   /**
-   * Return a formatted postcode
+   * Return a formatted postcode. We use "X" for Overseas
    *
    * @param string $postcode
    *
    * @return string
    */
   private static function getPostCode($postcode) {
+    // make uppercase
+    $postcode = strtoupper($postcode);
+    if ($postcode === 'X') {
+      // Overseas
+      return $postcode;
+    }
+
     // remove non alphanumeric characters
     $cleanPostcode = preg_replace("/[^A-Za-z0-9]/", '', $postcode);
-    // make uppercase
-    $cleanPostcode = strtoupper($cleanPostcode);
     // insert space
     $postcode = substr($cleanPostcode, 0, -3) . " " . substr($cleanPostcode, -3);
     return $postcode;
   }
 
-  public static function getDonorAddress($p_contact_id, $p_contribution_receive_date) {
-    $aAddress['id']       = NULL;
-    $aAddress['address']  = NULL;
+  /**
+   * Get the donor address formatted for manual (report) or online submission
+   *
+   * @param int $contactID
+   * @param string $contributionReceiveDate
+   *
+   * @return mixed
+   */
+  public static function getDonorAddress($contactID, $contributionReceiveDate) {
+    // Declaration may be a few seconds after contribution. But as long as it's on the same day it counts!
+    $contributionReceiveDate = date('Ymd', strtotime($contributionReceiveDate)) . '235959';
+    $aAddress['address'] = NULL;
     $aAddress['postcode'] = NULL;
-    $aAddress['house_number'] = NULL;
+    $aAddress['house'] = NULL;
 
     // We need to get the declaration that was current at the time that the contribution was made.
     // Look for a declaration that:
     //   - was eligible (ie. eligible_for_gift_aid is 1 or 3 and not 0).
     //   - contribution receive date was between start and end date for declaration.
-    $sSql =<<<SQL
-              SELECT   id         AS id
-              ,        address    AS address
-              ,        post_code  AS postcode
+    $sSql = "
+              SELECT   address    AS address,
+                       post_code  AS postcode
               FROM     civicrm_value_gift_aid_declaration
               WHERE    entity_id  =  %1
               AND      start_date <= %2
@@ -624,44 +643,20 @@ class CRM_Civigiftaid_Declaration {
               AND      eligible_for_gift_aid > 0
               ORDER BY start_date ASC
               LIMIT  1
-SQL;
+";
     $aParams = [
-      1 => [$p_contact_id, 'Integer'],
-      2 => [$p_contribution_receive_date, 'Timestamp']
+      1 => [$contactID, 'Integer'],
+      2 => [$contributionReceiveDate, 'Timestamp']
     ];
 
-    try {
-      $oDao = CRM_Core_DAO::executeQuery($sSql, $aParams);
-      if ($oDao->fetch()) {
-        $aAddress['id'] = $oDao->id;
-        $aAddress['address'] = $oDao->address;
-        $aAddress['house_number'] = self::getHouseNo($oDao->address);
-        $aAddress['postcode'] = self::getPostCode($oDao->postcode);
-      }
-    }
-    catch (Exception $e) {
-      \Civi::log()->error('getDonorAddress error: ' . $e->getMessage());
+    $oDao = CRM_Core_DAO::executeQuery($sSql, $aParams);
+    if ($oDao->fetch()) {
+      $aAddress['address'] = $oDao->address;
+      $aAddress['house'] = substr(explode(',', $oDao->address)[0] ?? '', 0, 40);
+      $aAddress['postcode'] = self::getPostCode($oDao->postcode);
     }
 
     return $aAddress;
-  }
-
-  /**
-   * split the phrase to break after the house name (including spaces), or
-   * number (including a following letter, e.g. "221b")
-   * which include " ", \r, \t, \n and \f
-   * @param string $p_address_line
-   *
-   * @return string|null
-   */
-  private static function getHouseNo($p_address_line) {
- 	preg_match('/^([a-zA-Z\s]+[0-9]*)|^([0-9]*[a-zA-Z]?)/',$p_address_line,$aAddress);
-    $aAddress = array_values(array_filter($aAddress));
-    if (empty($aAddress)) {
-      return NULL;
-    } else {
-      return $aAddress[0];
-    }
   }
 
 }
