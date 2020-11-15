@@ -139,7 +139,7 @@ function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
   $item[] = [
     'label'      => E::ts('Settings'),
     'name'       => 'settings',
-    'url'        => "civicrm/admin/giftaid/settings",
+    'url'        => "civicrm/admin/setting/ukgiftaid",
     'permission' => 'access CiviContribute',
     'operator'   => NULL,
     'separator'  => NULL,
@@ -184,6 +184,28 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
       ->addScriptFile(E::LONG_NAME, 'resources/js/batch.js', 1, 'html-header')
       ->addStyleFile(E::LONG_NAME, 'resources/css/batch.css', 1, 'html-header');
       break;
+
+    case 'CRM_Admin_Form_Generic':
+      if ($form->getSettingPageFilter() !== 'ukgiftaid') {
+        return;
+      }
+
+      $helpText = E::ts(
+        'Configure settings for GiftAid. You can specify which financial types are eligible. Also please read the <a href="%1" target="_blank">documentation</a>.',
+        [
+          1 => 'https://docs.civicrm.org/ukgiftaid'
+        ]
+      );
+      // addMarkup was added in CiviCRM 5.32 via https://github.com/civicrm/civicrm-core/commit/e564eac67d3fcfee8fad1760e928f6af81e13d22
+      if (method_exists(\Civi::resources(), 'addMarkup')) {
+        \Civi::resources()
+          ->addMarkup('<div class="help">' . $helpText . '</div>', [
+            'weight' => -1,
+            'region' => 'page-body'
+          ]);
+      }
+
+      \Civi::resources()->addScriptFile(E::LONG_NAME, 'js/ukgiftaid.settings.js');
   }
 }
 

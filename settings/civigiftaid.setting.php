@@ -27,39 +27,43 @@ use CRM_Civigiftaid_ExtensionUtil as E;
 
 return [
   'civigiftaid_globally_enabled' => [
-    'admin_group' => 'civigiftaid_general',
-    'admin_grouptitle' => 'Gift Aid Financial Types',
-    'admin_groupdescription' => 'Customise which financial types gift aid should apply to.',
-    'group_name' => 'CiviGiftAid Settings',
-    'group' => 'civigiftaid',
     'name' => 'civigiftaid_globally_enabled',
     'type' => 'Boolean',
-    'html_type' => 'Checkbox',
-    'default' => 1,
+    'html_type' => 'checkbox',
+    'default' => TRUE,
     'add' => '5.0',
     'is_domain' => 1,
     'is_contact' => 0,
-    'description' => 'Enable gift aid for line items of any financial type',
+    'title' => E::ts('Enable gift aid for line items of any financial type'),
     'html_attributes' => [],
+    'settings_pages' => [
+      'ukgiftaid' => [
+        'weight' => 5,
+      ]
+    ],
   ],
 
   // financial_type
   'civigiftaid_financial_types_enabled' => [
-    'admin_group' => 'civigiftaid_general',
-    'group_name' => 'CiviGiftAid Settings',
-    'group' => 'civigiftaid',
     'name' => 'civigiftaid_financial_types_enabled',
     'type' => 'Array',
-    'html_type' => 'select2',
+    'html_type' => 'select',
     'default' => [],
     'add' => '4.7',
     'is_domain' => 1,
     'is_contact' => 0,
-    'description' => 'Enabled Financial Types',
+    'title' => E::ts('Enabled Financial Types'),
+    'description' => E::ts('Select which financial types are eligible for gift aid.'),
     'html_attributes' => [
       'placeholder' => E::ts('- select -'),
-      'class' => 'huge',
+      'class' => 'crm-select2',
       'multiple' => TRUE
+    ],
+    'pseudoconstant' => ['callback' => 'CRM_Contribute_PseudoConstant::financialType'],
+    'settings_pages' => [
+      'ukgiftaid' => [
+        'weight' => 10,
+      ]
     ],
   ],
 ];
