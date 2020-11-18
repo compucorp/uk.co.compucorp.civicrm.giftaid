@@ -768,7 +768,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'weight' => '7',
         'is_active' => '1',
         'is_view' => '0',
-        'text_length' => '32',
+        'text_length' => '255',
         'note_columns' => '60',
         'note_rows' => '4',
         'column_name' => 'source',
