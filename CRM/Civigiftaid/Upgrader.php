@@ -610,6 +610,11 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3113() {
+    $this->log('Extend source field length to match contribution page');
+    $this->ensureDataStructures();
+  }
+
   /**
    * @return array
    */
