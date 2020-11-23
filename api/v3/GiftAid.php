@@ -13,6 +13,39 @@ use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
  * @param array $params
+ * @see https://lab.civicrm.org/extensions/ukgiftaid/-/issues/20
+ */
+function _civicrm_api3_gift_aid_getcontributioneligibility_spec(&$params) {
+  $params['contribution_id']['title'] = 'Contribution ID';
+  $params['contribution_id']['description'] = 'Optional contribution ID to update';
+  $params['contribution_id']['type'] = CRM_Utils_Type::T_INT;
+  $params['contribution_id']['api.required'] = FALSE;
+}
+
+/**
+ * @param array $params
+ *
+ * @return array
+ * @throws \CRM_Extension_Exception
+ * @throws \CiviCRM_API3_Exception
+ */
+function civicrm_api3_gift_aid_getcontributioneligibility($params) {
+  $contribution = civicrm_api3('Contribution', 'getsingle', [
+    'id' => $params['contribution_id'],
+  ]);
+
+  $receiveDate = (new DateTime($contribution['receive_date']))->format('YmdHis');
+
+  $declaration = CRM_Civigiftaid_Declaration::getDeclaration(
+    $contribution['contact_id'],
+    $receiveDate
+  );
+
+  return civicrm_api3_create_success($declaration, $params, 'GiftAid', 'getcontributioneligibility');
+}
+
+/**
+ * @param array $params
  */
 function _civicrm_api3_gift_aid_updateeligiblecontributions_spec(&$params) {
   $params['contribution_id']['title'] = 'Contribution ID';
