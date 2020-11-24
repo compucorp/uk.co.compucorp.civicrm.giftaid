@@ -126,7 +126,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         // Typical case, insist on these:
         $requiredParams = array_intersect_key($details, array_flip([
           'default_value', 'is_active', 'is_searchable', 'weight', 'help_pre',
-          'help_post', 'is_search_range'
+          'help_post', 'is_search_range', 'text_length'
         ] ));
       }
       unset($details['_requiredParams']);
