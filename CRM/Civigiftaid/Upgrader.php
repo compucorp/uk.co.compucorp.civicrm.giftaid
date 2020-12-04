@@ -126,7 +126,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         // Typical case, insist on these:
         $requiredParams = array_intersect_key($details, array_flip([
           'default_value', 'is_active', 'is_searchable', 'weight', 'help_pre',
-          'help_post', 'is_search_range', 'text_length'
+          'help_post', 'is_search_range', 'text_length', 'data_type'
         ] ));
       }
       unset($details['_requiredParams']);
@@ -612,6 +612,12 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
   public function upgrade_3113() {
     $this->log('Extend source field length to match contribution page');
+    $this->ensureDataStructures();
+    return TRUE;
+  }
+
+  public function upgrade_3114() {
+    $this->log('Check and update data_type for custom fields');
     $this->ensureDataStructures();
     return TRUE;
   }

@@ -9,6 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.4.7 (not yet released 2020-12-04)
+
+* When upgrading check and update customfield datatypes (`eligible_for_gift_aid` was `varchar` instead of `int` on some old installs).
+
 ## Release 3.4.6
 
 * Add `GiftAid.Ensuredatastructures` API.
