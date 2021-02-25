@@ -346,7 +346,6 @@ class CRM_Civigiftaid_Utils_Contribution {
   public static function validateContributionToBatch($contributionIDs) {
     $contributionsAdded = [];
     $contributionsAlreadyAdded = [];
-    $contributionsNotValid = [];
 
     // Get all contributions from found IDs that are not already in a batch
     $contributionParams = [
@@ -361,9 +360,13 @@ class CRM_Civigiftaid_Utils_Contribution {
         CRM_Civigiftaid_Utils::getCustomByName('Gift_Aid_Amount', 'Gift_Aid'),
         CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid'),
       ],
+      'receive_date' => ['<=' => 'now'],
       'options' => ['limit' => 0],
     ];
     $contributions = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
+
+    // Add contribution IDs that were not matched (eg. receive_date is in the future)
+    $contributionsNotValid = array_diff($contributionIDs, array_keys($contributions));
 
     foreach ($contributions as $contribution) {
       if (!empty($contribution[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')])) {

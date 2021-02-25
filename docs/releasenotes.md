@@ -9,9 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
-## Release 3.4.7 (not yet released 2020-12-04)
+## Release 3.4.7 (not yet released 2021-02-25)
 
 * When upgrading check and update customfield datatypes (`eligible_for_gift_aid` was `varchar` instead of `int` on some old installs).
+* Don't add contributions with a future "receive date" to batch. HMRC does not allow this!
 
 ## Release 3.4.6
 
