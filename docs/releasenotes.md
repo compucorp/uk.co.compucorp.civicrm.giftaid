@@ -13,6 +13,7 @@ Releases use the following numbering system:
 
 * When upgrading check and update customfield datatypes (`eligible_for_gift_aid` was `varchar` instead of `int` on some old installs).
 * Don't add contributions with a future "receive date" to batch. HMRC does not allow this!
+* Fix getting eligible financial types setting.
 
 ## Release 3.4.6
 
