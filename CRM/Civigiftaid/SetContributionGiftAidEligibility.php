@@ -191,7 +191,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    *   Whether eligible or not.
    */
   private static function financialTypeIsEligible($financialType) {
-    $eligibleFinancialTypes = explode(',', CRM_Civigiftaid_Settings::getValue('financial_types_enabled'));
+    $eligibleFinancialTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
     return in_array($financialType, $eligibleFinancialTypes);
   }
 
