@@ -17,11 +17,9 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
   protected $_customGroupExtends = ['Contribution'];
 
   /**
-   * Lazy cache for storing processed batches.
-   *
-   * @var array
+   * @var int
    */
-  private static $batches = [];
+  protected $batchID;
 
   public function __construct() {
     $this->_columns = [
@@ -236,6 +234,9 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
   public function where() {
     $this->_whereClauses[] = "{$this->_aliases['civicrm_value_gift_aid_submission']}.amount IS NOT NULL";
     $this->_whereClauses[] = "{$this->_aliases['civicrm_contact']}.contact_type = 'Individual'";
+    if ($this->batchID) {
+      $this->_whereClauses[] = "{$this->_aliases['civicrm_entity_batch']}.batch_id IN ({$this->batchID})";
+    }
     parent::where();
   }
 
@@ -277,6 +278,17 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
     ];
 
     return $statistics;
+  }
+
+  /**
+   * @throws \CRM_Core_Exception
+   */
+  public function preProcess() {
+    $this->batchID = CRM_Utils_Request::retrieveValue('batch_id', 'Positive', NULL, FALSE, 'GET');
+    if ($this->batchID) {
+      $this->_force = 1;
+    }
+    parent::preProcess();
   }
 
   /**
