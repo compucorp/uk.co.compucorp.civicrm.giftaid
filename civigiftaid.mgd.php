@@ -2,7 +2,7 @@
 
 return [
   0 => [
-    'name' => 'Gift Aid Report',
+    'name' => 'CRM_Civigiftaid_Report_Form_Contribute_GiftAid',
     'entity' => 'ReportTemplate',
     'params' => [
       'version' => 3,

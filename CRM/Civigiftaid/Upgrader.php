@@ -48,8 +48,13 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
     // In case this extension had been installed and uninstalled before:
     $this->removeLegacyRegisteredReport();
-
   }
+
+  public function postInstall() {
+    $this->createReportInstance();
+    return TRUE;
+  }
+
   /**
    * Safely repeatable function to ensure all the data structures we need
    * exist.
@@ -438,6 +443,36 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       throw $e;
     }
   }
+
+  private function createReportInstance() {
+    // Now see if we have a report and create one if we don't
+    try {
+      $reportID = CRM_Core_DAO::singleValueQuery(
+        "SELECT id FROM `civicrm_report_instance` WHERE report_id='" . CRM_Civigiftaid_Upgrader::REPORT_URL . "'"
+      );
+    }
+    catch (Exception $e) {
+      $reportID = NULL;
+    }
+
+    if (!$reportID) {
+      try {
+        $reportTemplate = civicrm_api3('ReportTemplate', 'getsingle', [
+          'value' => CRM_Civigiftaid_Upgrader::REPORT_URL,
+        ]);
+        civicrm_api3('ReportInstance', 'create', [
+          'title' => $reportTemplate['label'],
+          'report_id' => $reportTemplate['value'],
+          'description' => $reportTemplate['description'],
+          'permission' => 'access CiviReport',
+        ]);
+      }
+      catch (Exception $e) {
+        \Civi::log()->error('Failed to create GiftAid report instance. ' . $e->getMessage());
+      }
+    }
+  }
+
   /**
    * Example: Run an external SQL script when the module is uninstalled
    */
@@ -1111,7 +1146,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   /**
    * Remove report templates created by older versions
    */
-  private static function removeLegacyRegisteredReport(){
+  private static function removeLegacyRegisteredReport() {
     $report1 = civicrm_api3('OptionValue', 'get', [
       'option_group_id' => "report_template",
       'name' => 'GiftAid_Report_Form_Contribute_GiftAid',
