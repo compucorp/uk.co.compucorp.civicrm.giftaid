@@ -14,6 +14,9 @@ Releases use the following numbering system:
 * When upgrading check and update customfield datatypes (`eligible_for_gift_aid` was `varchar` instead of `int` on some old installs).
 * Don't add contributions with a future "receive date" to batch. HMRC does not allow this!
 * Fix getting eligible financial types setting.
+* Fix [#19](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/19) Find contribution with batch name bring no result.
+* Ensure that we create a GiftAid report instance.
+* Allow filtering report via batch_id URL parameter.
 
 ## Release 3.4.6
 
