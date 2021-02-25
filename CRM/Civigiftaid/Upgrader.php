@@ -131,7 +131,8 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         // Typical case, insist on these:
         $requiredParams = array_intersect_key($details, array_flip([
           'default_value', 'is_active', 'is_searchable', 'weight', 'help_pre',
-          'help_post', 'is_search_range', 'text_length', 'data_type'
+          'help_post', 'is_search_range', 'text_length', 'data_type', 'html_type',
+          'option_group_id',
         ] ));
       }
       unset($details['_requiredParams']);
@@ -657,6 +658,14 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3115() {
+    $this->log('Check and create GiftAid report instance');
+    $this->createReportInstance();
+    $this->log('Fix searching by GiftAid batch');
+    $this->ensureDataStructures();
+    return TRUE;
+  }
+
   /**
    * @return array
    */
@@ -921,9 +930,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'custom_group_id' => $this->contributionGiftaidCustomGroupId,
         'name' => 'Batch_Name',
         'label' => 'Batch Name',
-        'data_type' => 'String',
-        // 'html_type' => 'Select',
-        'html_type' => 'Text',
+        'html_type' => 'Select',
         'default_value' => '',
         'is_required' => '0',
         'is_searchable' => '1',
@@ -935,6 +942,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'note_columns' => '60',
         'note_rows' => '4',
         'column_name' => 'batch_name',
+        'option_group_id' => $this->optionGroupNameToId['giftaid_batch_name'],
         'in_selector' => '0',
       ],
     ];
