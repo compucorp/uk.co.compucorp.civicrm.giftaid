@@ -656,6 +656,59 @@ class CRM_Civigiftaid_Declaration {
       $aAddress['postcode'] = self::getPostCode($oDao->postcode);
     }
 
+    // To avoid conflicts, we only check for declarations in the
+    // next 4 years if we didn't find an active declaration in the
+    // date of the contribution
+
+    if (is_null($aAddress['address'])) {
+      $aAddress = self::getDonorAddressIn4YearsDeclaration($contactID, $contributionReceiveDate);
+    }
+
+    return $aAddress;
+  }
+
+  /**
+   * Get an donor address from a declaration made in the 4 years after the
+   * contribution with a eligibility of type:
+   *
+   * > "Yes, and for donations made in the past 4 years"
+   *
+   * @param int $contactID
+   * @param string $contributionReceiveDate
+   *
+   * @return mixed
+   */
+  private static function getDonorAddressIn4YearsDeclaration($contactID, $contributionReceiveDate) {
+    $contributionReceiveDate = date('Ymd', strtotime($contributionReceiveDate)) . '235959';
+    $aAddress = [];
+
+    $sSql = "
+        SELECT
+            address AS address,
+            post_code AS postcode
+        FROM civicrm_value_gift_aid_declaration
+        WHERE
+            entity_id = %1 AND
+            start_date <= %2 AND (
+                end_date IS NULL OR
+                DATE_ADD( end_date, INTERVAL 4 YEAR ) >= %2
+            ) AND
+            eligible_for_gift_aid = 3
+        ORDER BY start_date ASC
+        LIMIT  1
+";
+    $aParams = [
+      1 => [$contactID, 'Integer'],
+      2 => [$contributionReceiveDate, 'Timestamp']
+    ];
+
+    $oDao = CRM_Core_DAO::executeQuery($sSql, $aParams);
+    if ($oDao->fetch()) {
+      $aAddress['address'] = $oDao->address;
+      $aAddress['house'] = substr(explode(',', $oDao->address)[0] ?? '', 0, 40);
+      $aAddress['postcode'] = self::getPostCode($oDao->postcode);
+    }
+
     return $aAddress;
   }
 
