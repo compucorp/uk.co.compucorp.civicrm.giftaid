@@ -9,7 +9,7 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
-## Release 3.4.7 (not yet released 2021-02-25)
+## Release 3.4.7
 
 * When upgrading check and update customfield datatypes (`eligible_for_gift_aid` was `varchar` instead of `int` on some old installs).
 * Don't add contributions with a future "receive date" to batch. HMRC does not allow this!
@@ -17,6 +17,8 @@ Releases use the following numbering system:
 * Fix [#19](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/19) Find contribution with batch name bring no result.
 * Ensure that we create a GiftAid report instance.
 * Allow filtering report via batch_id URL parameter.
+* Fix [#17](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/17) Amount totals in Gift Aid Report are for 50 record subset, not total records in Batch.
+* Fix [#25](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/25) consider addresses from declarations in the next 4 years.
 
 ## Release 3.4.6
 
