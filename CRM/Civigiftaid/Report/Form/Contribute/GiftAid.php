@@ -9,10 +9,13 @@
  +--------------------------------------------------------------------+
  */
 
+use CRM_Civigiftaid_ExtensionUtil as E;
+
 /**
  * Class CRM_Civigiftaid_Report_Form_Contribute_GiftAid
  */
 class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
+
   protected $_addressField = FALSE;
   protected $_customGroupExtends = ['Contribution'];
 
@@ -27,7 +30,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
         'dao' => 'CRM_Batch_DAO_EntityBatch',
         'filters' => [
           'batch_id' => [
-            'title'        => ts('Batch'),
+            'title'        => E::ts('Batch'),
             'operatorType' => CRM_Report_Form::OP_MULTISELECT,
             'options'      => CRM_Civigiftaid_Utils_Contribution::getBatchIdTitle(),
             'type' => CRM_Utils_Type::T_INT,
@@ -36,7 +39,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
         'fields' => [
           'batch_id' => [
             'name'       => 'batch_id',
-            'title'      => ts('Batch ID'),
+            'title'      => E::ts('Batch ID'),
             'no_display' => TRUE,
             'required'   => TRUE,
           ]
@@ -47,19 +50,19 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
         'fields' => [
           'prefix_id' => [
             'name'       => 'prefix_id',
-            'title'      => ts('Title'),
+            'title'      => E::ts('Title'),
             'no_display' => FALSE,
             'required'   => TRUE,
           ],
           'first_name'      => [
             'name'       => 'first_name',
-            'title'      => ts('First Name'),
+            'title'      => E::ts('First Name'),
             'no_display' => FALSE,
             'required'   => TRUE,
           ],
           'last_name'    => [
             'name'       => 'last_name',
-            'title'      => ts('Last Name'),
+            'title'      => E::ts('Last Name'),
             'no_display' => FALSE,
             'required'   => TRUE,
           ],
@@ -70,24 +73,24 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
         'fields' => [
           'contribution_id' => [
             'name' => 'id',
-            'title' => ts('Contribution ID'),
+            'title' => E::ts('Contribution ID'),
             'required' => FALSE,
           ],
           'contact_id' => [
             'name' => 'contact_id',
-            'title' => ts('Donor Name'),
+            'title' => E::ts('Donor Name'),
             'no_display' => TRUE,
             'required' => TRUE,
           ],
           'receive_date' => [
             'name' => 'receive_date',
-            'title' => ts('Donation Date'),
+            'title' => E::ts('Donation Date'),
             'type' => CRM_Utils_Type::T_STRING,
             'required' => TRUE,
           ],
           'contribution_amount' => [
             'name' => 'total_amount',
-            'title' => ts('Donation Amount'),
+            'title' => E::ts('Donation Amount'),
             'type' => CRM_Utils_Type::T_INT,
             'no_display' => TRUE,
             'required' => TRUE,
@@ -100,13 +103,13 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
         'fields'   => [
           'street_address'    => [
             'name'       => 'street_address',
-            'title'      => ts('Street Address'),
+            'title'      => E::ts('Street Address'),
             'no_display' => TRUE,
             'required'   => TRUE,
           ],
           'postal_code'       => [
             'name'       => 'postal_code',
-            'title'      => ts('Postcode'),
+            'title'      => E::ts('Postcode'),
             'no_display' => FALSE,
             'required'   => TRUE,
           ],
@@ -201,10 +204,10 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
       'title' => 'House name or number',
     ];
 
-/**
- * HMRC Gift Aid spreadsheet requires columns for Aggregated Donations and Sponsored Events.
- * Normally blank, these are included here so the CiviCRM csv file matches the HMRC format.
- */
+    /**
+     * HMRC Gift Aid spreadsheet requires columns for Aggregated Donations and Sponsored Events.
+     * Normally blank, these are included here so the CiviCRM csv file matches the HMRC format.
+     */
     $this->_columnHeaders['aggregated_donations'] = [
       'title' => 'Aggregated Donations',
     ];
@@ -261,21 +264,27 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
       $totals[$key] = number_format($value, 2);
     }
 
-    $statistics['counts']['amount'] = [
-      'value' => $totals['contribution'],
-      'title' => 'Total Donation Amount',
-      'type'  => CRM_Utils_Type::T_MONEY
-    ];
-    $statistics['counts']['eligibleamount'] = [
-      'value' => $totals['eligibleAmount'],
-      'title' => 'Total Eligible Amount',
-      'type'  => CRM_Utils_Type::T_MONEY
-    ];
-    $statistics['counts']['giftaidamount'] = [
-      'value' => $totals['giftAidAmount'],
-      'title' => 'Total Gift Aid Amount',
-      'type'  => CRM_Utils_Type::T_MONEY
-    ];
+    $select = "
+      SELECT SUM({$this->_aliases['civicrm_value_gift_aid_submission']}.amount) as amount,
+        SUM({$this->_aliases['civicrm_value_gift_aid_submission']}.gift_aid_amount) as gift_aid_amount
+      ";
+
+    $sql = "{$select} {$this->_from} {$this->_where}";
+
+    $dao = CRM_Core_DAO::executeQuery($sql);
+
+    if ($dao->fetch()) {
+      $statistics['counts']['amount'] = [
+        'value' => $dao->amount,
+        'title' => E::ts('Total Amount'),
+        'type' => CRM_Utils_Type::T_MONEY
+      ];
+      $statistics['counts']['giftaidamount'] = [
+        'value' => $dao->gift_aid_amount,
+        'title' => E::ts('Total Gift Aid Amount'),
+        'type' => CRM_Utils_Type::T_MONEY
+      ];
+    }
 
     return $statistics;
   }
