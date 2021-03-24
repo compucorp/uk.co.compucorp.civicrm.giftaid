@@ -19,11 +19,6 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
   protected $_addressField = FALSE;
   protected $_customGroupExtends = ['Contribution'];
 
-  /**
-   * @var int
-   */
-  protected $batchID;
-
   public function __construct() {
     $this->_columns = [
       'civicrm_entity_batch' => [
@@ -237,8 +232,8 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
   public function where() {
     $this->_whereClauses[] = "{$this->_aliases['civicrm_value_gift_aid_submission']}.amount IS NOT NULL";
     $this->_whereClauses[] = "{$this->_aliases['civicrm_contact']}.contact_type = 'Individual'";
-    if ($this->batchID) {
-      $this->_whereClauses[] = "{$this->_aliases['civicrm_entity_batch']}.batch_id IN ({$this->batchID})";
+    if ($this->get('batchID')) {
+      $this->_whereClauses[] = "{$this->_aliases['civicrm_entity_batch']}.batch_id IN ({$this->get('batchID')})";
     }
     parent::where();
   }
@@ -293,9 +288,10 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
    * @throws \CRM_Core_Exception
    */
   public function preProcess() {
-    $this->batchID = CRM_Utils_Request::retrieveValue('batch_id', 'Positive', NULL, FALSE, 'GET');
-    if ($this->batchID) {
+    $batchID = CRM_Utils_Request::retrieveValue('batch_id', 'Positive', NULL, FALSE, 'GET');
+    if ($batchID) {
       $this->_force = 1;
+      $this->set('batchID', $batchID);
     }
     parent::preProcess();
   }
