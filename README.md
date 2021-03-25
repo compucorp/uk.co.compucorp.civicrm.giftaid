@@ -1,4 +1,4 @@
-# UK GiftAid Extension for CiviCRM (MJW version)
+# UK GiftAid Extension for CiviCRM
 
 This extension adds a profile, custom fields and code for managing the UK Gift Aid scheme.
 

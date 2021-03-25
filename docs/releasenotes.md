@@ -9,7 +9,7 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
-## Release 3.4.8 (Not yet released 2021-03-24)
+## Release 3.4.8
 
 * Fix exporting when batchID filter is specified via URL.
 
