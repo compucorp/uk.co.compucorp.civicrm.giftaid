@@ -39,13 +39,9 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
    */
   public function install() {
     $this->ensureDataStructures();
-
     // Nb. this is kept to preserve previous behaviour, it should not be needed.
     // Import existing batches.
     self::importBatches();
-
-    $this->ensurePastYearSubmissionJob();
-
     // In case this extension had been installed and uninstalled before:
     $this->removeLegacyRegisteredReport();
   }
@@ -362,29 +358,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'label' => 'Post code',
         'field_type' => 'Contact',
       ]);
-
-  }
-  /**
-   * Set up Past Year Submissions Job
-   */
-  public function ensurePastYearSubmissionJob() {
-    $existing = civicrm_api3('Job', 'get', [
-      'api_entity' => "gift_aid",
-      'api_action' => "makepastyearsubmissions",
-    ]);
-
-    if (empty($existing['count'])) {
-      $jobParams = [
-        'domain_id' => CRM_Core_Config::domainID(),
-        'run_frequency' => 'Daily',
-        'name' => 'Make Past Year Submissions',
-        'description' => 'Make Past Year Submissions',
-        'api_entity' => 'gift_aid',
-        'api_action' => 'makepastyearsubmissions',
-        'is_active' => 0,
-      ];
-      civicrm_api3('Job', 'create', $jobParams);
-    }
   }
 
   /**
@@ -531,15 +504,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
-  /**
-   * Set up Past Year Submissions Job
-   */
-  public function upgrade_3101() {
-    $this->log('Applying update 3101 - Add past year submissions job');
-    $this->ensurePastYearSubmissionJob();
-    return TRUE;
-  }
-
   public function upgrade_3102() {
     $this->log('Applying update 3102');
 
@@ -663,6 +627,22 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     $this->createReportInstance();
     $this->log('Fix searching by GiftAid batch');
     $this->ensureDataStructures();
+    return TRUE;
+  }
+
+  public function upgrade_3116() {
+    $this->log('Remove GiftAid.Makepastyearsubmissions scheduled job');
+    $jobsToDelete = civicrm_api3('Job', 'get', [
+      'api_entity' => "gift_aid",
+      'api_action' => "makepastyearsubmissions",
+    ]);
+    if ($jobsToDelete['count'] > 0) {
+      foreach ($jobsToDelete['values'] as $jobID => $jobDetail) {
+        civicrm_api3('Job', 'delete', [
+          'id' => $jobID,
+        ]);
+      }
+    }
     return TRUE;
   }
 
@@ -991,7 +971,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return $optionGroups;
   }
 
-  private function getOptionValues($optionGroups) {
+  private function getOptionValues() {
     $optionValues = [
       // eligibility_declaration_options: these apply to contacts and record details
       // about their declarations.
@@ -1083,12 +1063,11 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
   private function setOptionGroups() {
     foreach ($this->getOptionGroups() as $groupName => $groupParams) {
-
       // Create the option groups.
       $optionGroups[$groupName] = civicrm_api3('OptionGroup', 'get', [
         'name' => $groupName,
       ]);
-      if ($optionGroups[$groupName]['id'] ?? NULL) {
+      if (!empty($optionGroups[$groupName]['id'])) {
         $groupParams['id'] = $optionGroups[$groupName]['id'];
       }
       // Add new option groups and options
@@ -1098,7 +1077,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     }
 
     // Create the values within the groups.
-    $optionValues = $this->getOptionValues($optionGroups);
+    $optionValues = $this->getOptionValues();
     foreach($optionValues as $params) {
       $optionValue = civicrm_api3('OptionValue', 'get', [
         'option_group_id' => $params['option_group_id'],
