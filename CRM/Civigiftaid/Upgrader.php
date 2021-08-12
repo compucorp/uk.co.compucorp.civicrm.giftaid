@@ -971,7 +971,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return $optionGroups;
   }
 
-  private function getOptionValues($optionGroups) {
+  private function getOptionValues() {
     $optionValues = [
       // eligibility_declaration_options: these apply to contacts and record details
       // about their declarations.
@@ -1063,12 +1063,11 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
   private function setOptionGroups() {
     foreach ($this->getOptionGroups() as $groupName => $groupParams) {
-
       // Create the option groups.
       $optionGroups[$groupName] = civicrm_api3('OptionGroup', 'get', [
         'name' => $groupName,
       ]);
-      if ($optionGroups[$groupName]['id'] ?? NULL) {
+      if (!empty($optionGroups[$groupName]['id'])) {
         $groupParams['id'] = $optionGroups[$groupName]['id'];
       }
       // Add new option groups and options
@@ -1078,7 +1077,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     }
 
     // Create the values within the groups.
-    $optionValues = $this->getOptionValues($optionGroups);
+    $optionValues = $this->getOptionValues();
     foreach($optionValues as $params) {
       $optionValue = civicrm_api3('OptionValue', 'get', [
         'option_group_id' => $params['option_group_id'],
