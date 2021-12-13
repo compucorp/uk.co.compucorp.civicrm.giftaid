@@ -17,7 +17,7 @@ function civigiftaid_civicrm_config(&$config) {
 
   // Symfony hook priorities - see https://docs.civicrm.org/dev/en/latest/hooks/usage/symfony/#priorities
   // Add listeners for CiviCRM hooks that might need altering by other scripts
-  Civi::dispatcher()->addListener('hook_civicrm_post', 'CRM_Civigiftaid_SetContributionGiftAidEligibility::run');
+  Civi::dispatcher()->addListener('hook_civicrm_postCommit', 'CRM_Civigiftaid_SetContributionGiftAidEligibility::runCallback');
 
   // Run before giftaidonline (-100)
   \Civi::dispatcher()->addListener('hook_civicrm_navigationMenu', 'civigiftaid_symfony_civicrm_navigationMenu', 0);
@@ -184,14 +184,11 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
           1 => 'https://docs.civicrm.org/ukgiftaid'
         ]
       );
-      // addMarkup was added in CiviCRM 5.32 via https://github.com/civicrm/civicrm-core/commit/e564eac67d3fcfee8fad1760e928f6af81e13d22
-      if (method_exists(\Civi::resources(), 'addMarkup')) {
-        \Civi::resources()
-          ->addMarkup('<div class="help">' . $helpText . '</div>', [
-            'weight' => -1,
-            'region' => 'page-body'
-          ]);
-      }
+      \Civi::resources()
+        ->addMarkup('<div class="help">' . $helpText . '</div>', [
+          'weight' => -1,
+          'region' => 'page-body'
+        ]);
 
       \Civi::resources()->addScriptFile(E::LONG_NAME, 'js/ukgiftaid.settings.js');
   }
@@ -253,7 +250,7 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
  * @throws \CRM_Extension_Exception
  * @throws \CiviCRM_API3_Exception
  */
-function civigiftaid_civicrm_post($op, $objectName, $objectId, &$objectRef) {
+function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef) {
   switch ($objectName) {
     case 'Batch':
       if ($op !== 'delete') {
@@ -293,12 +290,7 @@ function civigiftaid_civicrm_post($op, $objectName, $objectId, &$objectRef) {
           'id' => $objectId,
           'details' => $objectRef,
         ];
-        if (CRM_Core_Transaction::isActive()) {
-          CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT, 'civigiftaid_callback_civicrm_post_contribution', [$callbackParams]);
-        }
-        else {
-          civigiftaid_callback_civicrm_post_contribution($callbackParams);
-        }
+        civigiftaid_callback_civicrm_post_contribution($callbackParams);
       }
       break;
   }
@@ -327,10 +319,16 @@ function civigiftaid_callback_civicrm_post_contribution($params) {
  * from multi-value custom field edit form:
  * - check end > start,
  * - check for overlaps between declarations.
+ *
+ * @param string $formName
+ * @param array $fields
+ * @param array $files
+ * @param CRM_Core_Form $form
+ * @param array $errors
+ *
+ * @throws \CiviCRM_API3_Exception
  */
 function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, &$errors) {
-  $errors = [];
-
   if ($formName == 'CRM_Contact_Form_CustomData') {
     $groupID = $form->getVar('_groupID');
     $contactID = $form->getVar('_entityId');
@@ -421,10 +419,6 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
         }
       }
     }
-  }
-
-  if (!empty($errors)) {
-    return $errors;
   }
 }
 

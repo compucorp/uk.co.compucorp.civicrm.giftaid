@@ -646,6 +646,32 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3117() {
+    $this->log('Add/update entity_batch_extends optionGroup and add civicrm_contribution optionValue (required for CiviCRM 5.44+)');
+    $this->setOptionGroups();
+    return TRUE;
+  }
+
+  /**
+   * Add the specified option group, gracefully if it already exists.
+   *
+   * @param CRM_Queue_TaskContext $ctx
+   * @param array $params
+   * @param array $options
+   *
+   * @return bool
+   */
+  public static function addOptionGroup(CRM_Queue_TaskContext $ctx, $params, $options): bool {
+    $defaults = ['is_active' => 1];
+    $optionDefaults = ['is_active' => 1];
+    $optionDefaults['option_group_id'] = \CRM_Core_BAO_OptionGroup::ensureOptionGroupExists(array_merge($defaults, $params));
+
+    foreach ($options as $option) {
+      \CRM_Core_BAO_OptionValue::ensureOptionValueExists(array_merge($optionDefaults, $option));
+    }
+    return TRUE;
+  }
+
   /**
    * @return array
    */
@@ -935,33 +961,41 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     $optionGroups = [
       'eligibility_declaration_options' => [
         'name' => 'eligibility_declaration_options',
-        'title' => 'GiftAid eligibility declaration options',
+        'title' => E::ts('GiftAid eligibility declaration options'),
         'is_active' => 1,
         'is_reserved' => 1,
       ],
       'uk_taxpayer_options' => [
         'name' => 'uk_taxpayer_options',
-        'title' => 'GiftAid contribution eligibility',
+        'title' => E::ts('GiftAid contribution eligibility'),
         'is_active' => 1,
         'is_reserved' => 1
       ],
       'giftaid_basic_rate_tax' => [
         'name' => 'giftaid_basic_rate_tax',
-        'title' => 'GiftAid basic rate of tax',
+        'title' => E::ts('GiftAid basic rate of tax'),
         'is_active' => 1,
         'is_reserved' => 1
       ],
       'giftaid_batch_name' => [
         'name' => 'giftaid_batch_name',
-        'title' => 'GiftAid batch name',
+        'title' => E::ts('GiftAid batch name'),
         'is_active' => 1,
         'is_reserved' => 1
       ],
       'reason_ended' => [
         'name' => 'reason_ended',
-        'title' => 'GiftAid reason ended',
+        'title' => E::ts('GiftAid reason ended'),
         'is_active' => 1,
         'is_reserved' => 1
+      ],
+      // 'Core optiongroup - Added in CiviCRM 5.44. Add/update entity_batch_extends option group and add civicrm_contribution
+      'entity_batch_extends' => [
+        'name' => 'entity_batch_extends',
+        'title' => E::ts('Entity Batch Extends'),
+        'is_reserved' => 1,
+        'is_active' => 1,
+        'is_locked' => 1,
       ],
     ];
     $optionGroups['batch_type'] = civicrm_api3('OptionGroup', 'getsingle', [
@@ -971,6 +1005,8 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   }
 
   private function getOptionValues() {
+    $contributeComponentID = CRM_Core_DAO::singleValueQuery('SELECT id from civicrm_component WHERE name = "CiviContribute"');
+
     $optionValues = [
       // eligibility_declaration_options: these apply to contacts and record details
       // about their declarations.
@@ -1050,11 +1086,26 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'option_group_id' => $this->optionGroupNameToId['batch_type'],
-        'name' => "Gift Aid",
+        'name' => 'Gift Aid',
         'is_active' => 1,
         'is_reserved' => 1,
         'is_default' => 0,
-      ]
+      ],
+      // entity_batch_extends (Core optiongroup from 5.44) - giftaid only needs civicrm_contribution optionValue.
+      [
+        'option_group_id' => $this->optionGroupNameToId['entity_batch_extends'],
+        'name' => 'civicrm_financial_trxn',
+        'value' => 'civicrm_financial_trxn',
+        'label' => E::ts('Financial Transactions'),
+        'component_id' => $contributeComponentID,
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['entity_batch_extends'],
+        'name' => 'civicrm_contribution',
+        'value' => 'civicrm_contribution',
+        'label' => E::ts('Contributions'),
+        'component_id' => $contributeComponentID,
+      ],
     ];
 
     return $optionValues;
@@ -1080,7 +1131,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     foreach($optionValues as $params) {
       $optionValue = civicrm_api3('OptionValue', 'get', [
         'option_group_id' => $params['option_group_id'],
-        'value' => $params['value'],
+        'name' => $params['name'],
       ]);
       if (CRM_Utils_Array::value('id', $optionValue)) {
         $params['id'] = $optionValue['id'];

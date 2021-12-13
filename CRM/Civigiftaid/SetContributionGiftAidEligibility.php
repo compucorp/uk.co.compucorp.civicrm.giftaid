@@ -20,27 +20,15 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * Set the gift aid eligibility for a contribution if it has an eligible financial type.
    *
    * @param \Civi\Core\Event\GenericHookEvent $event
-   * @param $hook
    *
    * @throws \CRM_Extension_Exception
    * @throws \CiviCRM_API3_Exception
    */
-  public static function run($event, $hook) {
+  public static function runCallback($event) {
     if (($event->entity !== 'Contribution') || !in_array($event->action, ['create', 'edit'])) {
       return;
     }
 
-    if (CRM_Core_Transaction::isActive()) {
-      CRM_Core_Transaction::addCallback(CRM_Core_Transaction::PHASE_POST_COMMIT,
-        'CRM_Civigiftaid_SetContributionGiftAidEligibility::runCallback',
-        [$event]);
-    }
-    else {
-      CRM_Civigiftaid_SetContributionGiftAidEligibility::runCallback($event);
-    }
-  }
-
-  public static function runCallback($event) {
     if (self::setGiftAidEligibilityStatus($event->id, $event->action)) {
       $event->object->find();
       if (!CRM_Civigiftaid_Declaration::getDeclaration($event->object->contact_id)) {
@@ -95,7 +83,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
     // If the "Eligible for gift-aid" field is already set don't try to set it.
     if (!isset($eligibility)) {
       // We need to set the Eligible for gift-aid field.
-      $allFinancialTypesEnabled = (bool) CRM_Civigiftaid_Settings::getValue('globally_enabled');
+      $allFinancialTypesEnabled = (bool) \Civi::settings()->get('civigiftaid_globally_enabled');
 
       if ($allFinancialTypesEnabled) {
         $eligibility = 1;

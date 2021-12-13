@@ -4,11 +4,6 @@ This extension adds a profile, custom fields and code for managing the UK Gift A
 
 The extension is licensed under [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html).
 
-## Requirements
-
-* PHP v7.2+
-* CiviCRM 5.28+
-
 ## Installation
 
 See: [Installing a new extension](https://docs.civicrm.org/sysadmin/en/latest/customize/extensions/#installing-a-new-extension).
