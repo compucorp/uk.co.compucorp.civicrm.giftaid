@@ -409,7 +409,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     //$financialTypesAvailable = (Array) CRM_Civigiftaid_Settings::get('financial_types_enabled');
     CRM_Civigiftaid_Settings::save([
       'globally_enabled' => 1,
-      'financial_types_enabled' => '1', // Just donations.
+      'financial_types_enabled' => [1], // Just donations.
     ]);
 
     // Create a contact.
