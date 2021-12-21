@@ -1,5 +1,8 @@
 <?php
 
+use Civi\Api4\Contact;
+use Civi\Api4\Contribution;
+use Civi\Api4\CustomValue;
 use CRM_Civigiftaid_ExtensionUtil as E;
 use Civi\Test\HeadlessInterface;
 use Civi\Test\HookInterface;
@@ -22,7 +25,6 @@ use Civi\Test\TransactionalInterface;
  * @group headless
  */
 class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implements HeadlessInterface, HookInterface {
-
 
   /** @var array */
   protected $contacts = [];
@@ -49,6 +51,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
   public function setUp() {
     parent::setUp();
+
     // This is common to all tests.
     $this->setupFixture1();
   }
@@ -59,7 +62,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     }
     $contactIDs = array_keys($this->contacts);
 
-    $contributions = \Civi\Api4\Contribution::get()
+    $contributions = Contribution::get()
       ->addSelect('id', 'contact_id')
       ->addWhere('contact_id', 'IN', $contactIDs)
       ->setCheckPermissions(FALSE)
@@ -67,14 +70,14 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
     // Delete contributions
     if ($contributions) {
-      \Civi\Api4\Contribution::delete()
+      Contribution::delete()
         ->addWhere('contact_id', 'IN', $contactIDs)
         ->setCheckPermissions(FALSE)
         ->execute();
     }
 
     // Delete Contacts
-    \Civi\Api4\Contact::delete()
+    Contact::delete()
       ->addWhere('id', 'IN', array_keys($this->contacts))
       ->setCheckPermissions(FALSE)
       ->execute();
@@ -106,10 +109,10 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     $session->set('postProcessTitle', 'testDeclarationUpdate', E::LONG_NAME);
 
     foreach ([
-      CRM_Civigiftaid_Declaration::DECLARATION_IS_YES => 'Yes',
-      CRM_Civigiftaid_Declaration::DECLARATION_IS_NO => 'No',
-      CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS => 'Yes and past 4',
-    ] as $type=>$assertionContext) {
+               CRM_Civigiftaid_Declaration::DECLARATION_IS_YES => 'Yes',
+               CRM_Civigiftaid_Declaration::DECLARATION_IS_NO => 'No',
+               CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS => 'Yes and past 4',
+             ] as $type=>$assertionContext) {
 
       $session->set('uktaxpayer', $type, E::LONG_NAME);
       $assertionContext = "During '$assertionContext' declaration test round";
@@ -120,12 +123,12 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       // Create the contribution which should trigger storing a declaration.
 
       // Create (eligible) contribution
-      $contributionID = \Civi\Api4\Contribution::create()
-        ->setCheckPermissions(FALSE)
-        ->addValue('contact_id', $this->contacts[0]['id'])
-        ->addValue('financial_type_id', 1)
-        ->addValue('total_amount', 100)
-        ->execute()[0]['id'] ?? 0;
+      $contributionID = Contribution::create()
+          ->setCheckPermissions(FALSE)
+          ->addValue('contact_id', $this->contacts[0]['id'])
+          ->addValue('financial_type_id', 1)
+          ->addValue('total_amount', 100)
+          ->execute()[0]['id'] ?? 0;
       $this->assertGreaterThan(0, $contributionID, $assertionContext);
 
       // Check for declarations.
@@ -154,13 +157,13 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       // End of test, clean up:
 
       // Delete the contribution
-      \Civi\Api4\Contribution::delete()
+      Contribution::delete()
         ->setCheckPermissions(FALSE)
         ->addWhere('id', '=', $contributionID)
         ->execute();
 
       // Delete the declaration.
-      \Civi\Api4\CustomValue::delete('Gift_Aid_Declaration')
+      CustomValue::delete('Gift_Aid_Declaration')
         ->setCheckPermissions(FALSE)
         ->addWhere('id', '=', $decl['id'])
         ->execute();
@@ -243,13 +246,14 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     // End of test, clean up:
 
     // Delete the declaration.
-    \Civi\Api4\CustomValue::delete('Gift_Aid_Declaration')
+    CustomValue::delete('Gift_Aid_Declaration')
       ->setCheckPermissions(FALSE)
       ->addWhere('id', 'IN', $declarationsToDelete)
       ->execute();
 
   }
   public function logicTestProvider() {
+    require_once('CRM/Civigiftaid/Declaration.php');
     $no = CRM_Civigiftaid_Declaration::DECLARATION_IS_NO;
     $yes = CRM_Civigiftaid_Declaration::DECLARATION_IS_YES;
     $yesPast4 = CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS;
@@ -352,6 +356,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       ],
     ];
   }
+
   protected function dump() {
 
     $customFieldID = CRM_Core_BAO_CustomField::getCustomFieldID('Eligible_for_Gift_Aid', 'Gift_Aid');
@@ -413,7 +418,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     ]);
 
     // Create a contact.
-    $result = \Civi\Api4\Contact::create()
+    $result = Contact::create()
       ->setCheckPermissions(FALSE)
       ->addValue('contact_type', 'Individual')
       ->addValue('display_name', 'Test 123')

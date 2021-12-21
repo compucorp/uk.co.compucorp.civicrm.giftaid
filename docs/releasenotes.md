@@ -9,9 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
-## Release 3.4.9 (not yet released)
+## Release 3.4.9
 
 * Remove broken `GiftAid.Makepastyearsubmissions` scheduled job (the API call was actually removed a year ago).
+* Drop support for CiviCRM < 5.35. Add support for CiviCRM 5.44+.
 
 ## Release 3.4.8
 
