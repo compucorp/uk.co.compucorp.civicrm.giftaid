@@ -49,14 +49,14 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     return $r;
   }
 
-  public function setUp() {
+  public function setUp(): void {
     parent::setUp();
 
     // This is common to all tests.
     $this->setupFixture1();
   }
 
-  public function tearDown() {
+  public function tearDown(): void {
     if (!$this->contacts) {
       return;
     }
@@ -253,7 +253,6 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
   }
   public function logicTestProvider() {
-    require_once('CRM/Civigiftaid/Declaration.php');
     $no = CRM_Civigiftaid_Declaration::DECLARATION_IS_NO;
     $yes = CRM_Civigiftaid_Declaration::DECLARATION_IS_YES;
     $yesPast4 = CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS;
