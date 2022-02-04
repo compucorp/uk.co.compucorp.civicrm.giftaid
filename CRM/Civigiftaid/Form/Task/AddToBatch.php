@@ -128,7 +128,7 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
     $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
     $giftAidBatchNameParams = [
       'option_group_id' => $optionGroupID,
-      'value' => $createdBatch['id'],
+      'value' => $this->batchName,
       'label' => $this->batchTitle,
       'name' => $this->batchName,
     ];
