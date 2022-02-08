@@ -207,7 +207,7 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
-    $ukTaxPayerField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'Gift_Aid_Declaration');
+    $ukTaxPayerField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration');
     if (isset($form->_submitValues[$ukTaxPayerField])) {
       $session->set('uktaxpayer', $form->_submitValues[$ukTaxPayerField], E::LONG_NAME);
     }
@@ -432,7 +432,7 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
  */
 function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value, $entityId, $fieldInfo) {
   // Gift Aid batch name is stored as "name" but we want to display "label".
-  if ($fieldInfo['name'] === 'Batch_Name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value)) {
+  if ($fieldInfo['name'] === 'batch_name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value)) {
     try {
       $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
       $displayValue = civicrm_api3('OptionValue', 'getvalue', [

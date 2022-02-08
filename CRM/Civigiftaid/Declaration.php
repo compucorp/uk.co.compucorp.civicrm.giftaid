@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\Contribution;
+use Civi\Api4\CustomValue;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -39,18 +41,11 @@ class CRM_Civigiftaid_Declaration {
       return;
     }
 
-    $contributionCustomGiftAidEligibleFieldName = CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid');
-    $contributionCustomGiftAidBatchNameFieldName = CRM_Civigiftaid_Utils::getCustomByName('Batch_Name', 'Gift_Aid');
-
-    $contribution = civicrm_api3('Contribution', 'getsingle', [
-      'id' => $contributionID,
-      'return' => ['contact_id',
-        'receive_date',
-        $contributionCustomGiftAidEligibleFieldName,
-        $contributionCustomGiftAidBatchNameFieldName,
-        'contribution_recur_id'
-      ]
-    ]);
+    $contribution = Contribution::get(FALSE)
+      ->addSelect('*', 'custom.*')
+      ->addWhere('id', '=', $contributionID)
+      ->execute()
+      ->first();
 
     $startDate = $givenDate = $contribution['receive_date'];
     $contactID = $contribution['contact_id'];
@@ -146,17 +141,10 @@ class CRM_Civigiftaid_Declaration {
    * @return array
    */
   public static function getAllDeclarations($contactID) {
-    if (!isset(Civi::$statics[__CLASS__][$contactID]['declarations'])) {
-      $sql = "SELECT id, entity_id, eligible_for_gift_aid, start_date, given_date, end_date, reason_ended, source, notes
-              FROM civicrm_value_gift_aid_declaration
-              WHERE  entity_id = %1";
-      $sqlParams[1] = [$contactID, 'Integer'];
-
-      $dao = CRM_Core_DAO::executeQuery($sql, $sqlParams);
-      Civi::$statics[__CLASS__][$contactID]['declarations'] = $dao->fetchAll();
-    }
-
-    return Civi::$statics[__CLASS__][$contactID]['declarations'];
+    return CustomValue::get('gift_aid_declaration', FALSE)
+      ->addWhere('entity_id', '=', $contactID)
+      ->execute()
+      ->getArrayCopy();
   }
 
   /**
@@ -169,23 +157,19 @@ class CRM_Civigiftaid_Declaration {
    *
    * @return array
    */
-  private static function getPartialDeclaration($contactID): array {
-    $sql = "SELECT id as id, start_date, eligible_for_gift_aid
-              FROM civicrm_value_gift_aid_declaration
-              WHERE  entity_id = %1 ORDER BY id DESC LIMIT 1";
-    $sqlParams = [
-      1 => [$contactID, 'Integer']
-    ];
-
-    $dao = CRM_Core_DAO::executeQuery($sql, $sqlParams);
-    $dao->fetch();
-    if (!empty($dao->id) && empty($dao->start_date)) {
+  private static function getPartialDeclaration(int $contactID): array {
+    $giftAidDeclaration = CustomValue::get('gift_aid_declaration', FALSE)
+      ->addWhere('entity_id', '=', $contactID)
+      ->addOrderBy('id', 'DESC')
+      ->setLimit(1)
+      ->execute()
+      ->first();
+    if (!empty($giftAidDeclaration)) {
       return [
-        'id' => (int) $dao->id,
-        'eligible_for_gift_aid' => (int) $dao->eligible_for_gift_aid,
+        'id' => $giftAidDeclaration['id'],
+        'eligible_for_gift_aid' => $giftAidDeclaration['eligible_for_gift_aid'],
       ];
     }
-
     return [];
   }
 
@@ -218,60 +202,84 @@ class CRM_Civigiftaid_Declaration {
    * @param array $params
    */
   public static function insertDeclaration($params) {
-    $cols = [
-      'entity_id' => 'Integer',
-      'eligible_for_gift_aid' => 'Integer',
-      'address' => 'String',
-      'post_code' => 'String',
-      'start_date' => 'Timestamp',
-      'given_date' => 'Timestamp',
-      'end_date' => 'Timestamp',
-      'reason_ended' => 'String',
-      'source' => 'String',
-      'notes' => 'String',
-    ];
-
     if (isset($params['id'])) {
-      // We will update an existing record.
-      $keyVals = [];
-      $queryParams[1] = [$params['id'], 'Integer'];
-      $count = 2;
-      foreach ($cols as $colName => $colType) {
-        if (isset($params[$colName])) {
-          $keyVals[] = "{$colName}=%{$count}";
-          $queryParams[$count] = [
-            $params[$colName] ?? '',
-            $colType
-          ];
-        }
-        $count++;
-      }
-      $keyValsString = implode(',', $keyVals);
-      $query = "UPDATE civicrm_value_gift_aid_declaration SET {$keyValsString} WHERE id=%1";
+      $customValueAPI = CustomValue::update('gift_aid_declaration', FALSE)
+        ->addWhere('id', '=', $params['id']);
     }
     else {
+      $customValueAPI = CustomValue::create('gift_aid_declaration', FALSE);
+
       // We will create a new record.
       if (empty($params['given_date'])) {
         // We should store a given date. Default to the start_date, but if that's not
         // given, assume now.
         $params['given_date'] = $params['start_date'] ?? date('YmdHis');
       }
-      $count = 1;
-      foreach ($cols as $colName => $colType) {
-        $insertVals[$colName] = $params[$colName] ?? '';
-        $values[] = "%{$count}";
-        $queryParams[$count] = [
-          $params[$colName] ?? '',
-          $colType
-        ];
-        $count++;
-      }
+    }
 
-      $query = "INSERT INTO civicrm_value_gift_aid_declaration (" . implode(',', array_keys($insertVals)) . ") VALUES (" . implode(',', $values) . ")";
+    if (isset($params['entity_id'])) {
+      $customValueAPI->addValue('entity_id', $params['entity_id']);
+    }
+    if (isset($params['eligible_for_gift_aid'])) {
+      $customValueAPI->addValue('eligible_for_gift_aid', $params['eligible_for_gift_aid']);
+    }
+    if (isset($params['address'])) {
+      $customValueAPI->addValue('address', $params['address']);
+    }
+    if (isset($params['post_code'])) {
+      $customValueAPI->addValue('post_code', $params['post_code']);
+    }
+    if (isset($params['start_date'])) {
+      //$customValueAPI->addValue('start_date', $params['start_date']);
+    }
+    if (isset($params['given_date'])) {
+      //$customValueAPI->addValue('given_date', $params['given_date']);
+    }
+    if (isset($params['end_date'])) {
+      //$customValueAPI->addValue('end_date', $params['end_date']);
+    }
+    if (isset($params['reason_ended'])) {
+      $customValueAPI->addValue('reason_ended', $params['reason_ended']);
+    }
+    if (isset($params['source'])) {
+      $customValueAPI->addValue('source', $params['source']);
+    }
+    if (isset($params['notes'])) {
+      $customValueAPI->addValue('notes', $params['notes']);
     }
 
     // Insert or update.
-    CRM_Core_DAO::executeQuery($query, $queryParams);
+    $customValueID = $customValueAPI->execute()->first()['id'];
+    self::fixBrokenApi4CustomValueUpdateDateFields($customValueID, $params);
+  }
+
+  /**
+   * See https://github.com/civicrm/civicrm-core/pull/22726 - datetime customfield doesn't work with API4!
+   * @param int $customValueID
+   * @param array $params
+   *
+   * @return void
+   */
+  public static function fixBrokenApi4CustomValueUpdateDateFields(int $customValueID, array $params) {
+    // See https://github.com/civicrm/civicrm-core/pull/22726 - datetime customfield doesn't work with API4!
+    $sqlValues[1] = [$customValueID, 'Int'];
+    if (isset($params['given_date'])) {
+      $setValues[] = 'given_date=%2';
+      $sqlValues[2] = [$params['given_date'], 'Timestamp'];
+    }
+    if (isset($params['start_date'])) {
+      $setValues[] = 'start_date=%3';
+      $sqlValues[3] = [$params['start_date'], 'Timestamp'];
+    }
+    if (isset($params['end_date'])) {
+      $setValues[] = 'end_date=%4';
+      $sqlValues[4] = [$params['end_date'], 'Timestamp'];
+    }
+    if (!empty($setValues)) {
+      $setValuesSQL = implode(',', $setValues);
+      $sql = "UPDATE civicrm_value_gift_aid_declaration SET {$setValuesSQL} WHERE id=%1";
+      CRM_Core_DAO::executeQuery($sql, $sqlValues);
+    }
   }
 
   /**
@@ -280,31 +288,12 @@ class CRM_Civigiftaid_Declaration {
    *
    * @param int $contactID
    */
-  public static function deletePartialDeclaration($contactID) {
-    $sql = "DELETE FROM civicrm_value_gift_aid_declaration
-              WHERE entity_id = %1 AND post_code IS NULL AND start_date IS NULL";
-    $sqlParams = [
-      1 => [$contactID, 'Integer'],
-    ];
-
-    CRM_Core_DAO::executeQuery($sql, $sqlParams);
-  }
-
-  /**
-   * Get all contacts that have a giftaid declaration
-   *
-   * @return array
-   */
-  public static function getContactsWithDeclarations() {
-    $sql = "
-        SELECT   entity_id
-        FROM     civicrm_value_gift_aid_declaration
-        GROUP BY entity_id";
-
-    $contactsWithDeclarations = CRM_Core_DAO::executeQuery($sql)
-      ->fetchMap('entity_id', 'entity_id');
-
-    return $contactsWithDeclarations;
+  public static function deletePartialDeclaration(int $contactID) {
+    CustomValue::delete('gift_aid_declaration', FALSE)
+      ->addWhere('entity_id', '=', $contactID)
+      ->addWhere('post_code', 'IS NULL')
+      ->addWhere('start_date', 'IS NULL')
+      ->execute();
   }
 
   /**
@@ -617,54 +606,23 @@ class CRM_Civigiftaid_Declaration {
   /**
    * Get the donor address formatted for manual (report) or online submission
    *
-   * @param int $contactID
-   * @param string $contributionReceiveDate
+   * @param int $contributionID
    *
-   * @return mixed
+   * @return array
    */
-  public static function getDonorAddress($contactID, $contributionReceiveDate) {
-    // Declaration may be a few seconds after contribution. But as long as it's on the same day it counts!
-    $contributionReceiveDate = date('Ymd', strtotime($contributionReceiveDate)) . '235959';
-    $aAddress['address'] = NULL;
-    $aAddress['postcode'] = NULL;
-    $aAddress['house'] = NULL;
-
-    // We need to get the declaration that was current at the time that the contribution was made.
-    // Look for a declaration that:
-    //   - was eligible (ie. eligible_for_gift_aid is 1 or 3 and not 0).
-    //   - contribution receive date was between start and end date for declaration.
-    $sSql = "
-              SELECT   address    AS address,
-                       post_code  AS postcode
-              FROM     civicrm_value_gift_aid_declaration
-              WHERE    entity_id  =  %1
-              AND      start_date <= %2
-              AND      (end_date IS NULL OR end_date >= %2)
-              AND      eligible_for_gift_aid > 0
-              ORDER BY start_date ASC
-              LIMIT  1
-";
-    $aParams = [
-      1 => [$contactID, 'Integer'],
-      2 => [$contributionReceiveDate, 'Timestamp']
-    ];
-
-    $oDao = CRM_Core_DAO::executeQuery($sSql, $aParams);
-    if ($oDao->fetch()) {
-      $aAddress['address'] = $oDao->address;
-      $aAddress['house'] = substr(explode(',', $oDao->address)[0] ?? '', 0, 40);
-      $aAddress['postcode'] = self::getPostCode($oDao->postcode);
+  public static function getDonorAddress(int $contributionID): array {
+    $contribution = Contribution::get(FALSE)
+      ->addSelect('*', 'custom.*')
+      ->addWhere('id', '=', $contributionID)
+      ->execute()
+      ->first();
+    $declaration = CRM_Civigiftaid_Utils_Contribution::getDeclarationForContribution($contribution);
+    if ($declaration) {
+      $aAddress['address'] = $declaration['address'];
+      $aAddress['house'] = substr(explode(',', $declaration['address'])[0] ?? '', 0, 40);
+      $aAddress['postcode'] = self::getPostCode($declaration['post_code']);
     }
-
-    // To avoid conflicts, we only check for declarations in the
-    // next 4 years if we didn't find an active declaration in the
-    // date of the contribution
-
-    if (is_null($aAddress['address'])) {
-      $aAddress = self::getDonorAddressIn4YearsDeclaration($contactID, $contributionReceiveDate);
-    }
-
-    return $aAddress;
+    return $aAddress ?? [];
   }
 
   /**
