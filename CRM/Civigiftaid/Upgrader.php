@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\CustomField;
+use Civi\Api4\CustomGroup;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -72,7 +74,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
    */
   protected function ensureCustomGroups() {
     $this->declarationCustomGroupID = $this->findOrCreate('CustomGroup',
-      ['name' => 'Gift_Aid_Declaration'],
+      ['name' => 'gift_aid_declaration'],
       [
         'is_active' => 1,
         'extends'   => 'Individual',
@@ -89,7 +91,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     )['id'];
 
     $this->contributionGiftaidCustomGroupId = $this->findOrCreate('CustomGroup',
-      ['name' => 'Gift_Aid'],
+      ['name' => 'gift_aid'],
       [
         'is_active' => 1,
         'extends'   => 'Contribution',
@@ -138,7 +140,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       // Ensure field exists.
       // Note: we store its ID so we can look it up easily later.
       // We cannot simply store the name though because sadly we have used
-      // Eligible_for_Gift_Aid as a custom field name twice in two different
+      // eligible_for_gift_aid as a custom field name twice in two different
       // custom groups. Doh.
       $this->customFieldNamesToIds["$details[custom_group_id]--$details[name]"] = $this->findOrCreate('CustomField', $findParams, $requiredParams, $additionalCreateParams)['id'];
     }
@@ -148,7 +150,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
    */
   protected function ensureProfiles() {
     $profileId = $this->findOrCreate('UFGroup',
-      ['name' => 'Gift_Aid'],
+      ['name' => 'gift_aid'],
       [
         'is_active' => 1,
         'group_type' => 'Individual,Contact',
@@ -167,7 +169,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     $this->findOrCreate('UFField',
       [
         'uf_group_id' => $profileId,
-        'field_name' => 'custom_' . $this->customFieldNamesToIds["{$this->declarationCustomGroupID}--Eligible_for_Gift_Aid"],
+        'field_name' => 'custom_' . $this->customFieldNamesToIds["{$this->declarationCustomGroupID}--eligible_for_gift_aid"],
       ],
       [
         'is_active' => 1,
@@ -512,7 +514,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     CRM_Core_DAO::executeQuery("ALTER TABLE civicrm_value_gift_aid_submission MODIFY COLUMN eligible_for_gift_aid int");
 
     // Update custom field type from String to Int
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_custom_field SET data_type = 'Int' WHERE name = 'Eligible_for_Gift_Aid'");
+    CRM_Core_DAO::executeQuery("UPDATE civicrm_custom_field SET data_type = 'Int' WHERE name = 'eligible_for_gift_aid'");
 
     return TRUE;
   }
@@ -525,8 +527,8 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
   public function upgrade_3104() {
     $this->log('Applying update 3104 - change profile(s) to use Individual declaration eligibility field instead of contribution eligibility field');
-    $contributionGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('Eligible_For_Gift_Aid', 'Gift_Aid');
-    $contactGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('Eligible_For_Gift_Aid', 'Gift_Aid_Declaration');
+    $contributionGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid');
+    $contactGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration');
     $helpPost = '<p>By selecting &#039;Yes&#039; above you are confirming that you are a UK taxpayer and the amount of income and/or capital gains tax you pay is at least as much as we will reclaim on your donations in this tax year.</p>
 <p><b>About Gift Aid</b></p>
 <p>Gift Aid increases the value of donations to charities by allowing them to reclaim basic rate tax on your gift.  We would like to reclaim gift aid on your behalf.  We can only reclaim Gift Aid if you are a UK taxpayer.  Please confirm that you are a eligible for gift aid above.  <a href="http://www.hmrc.gov.uk/individuals/giving/gift-aid.htm">More about Gift Aid</a>.</p>';
@@ -652,6 +654,53 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3118() {
+    $this->log('Changing customfield names to lowercase');
+
+    // Note: CustomGroup::update doesn't seem to work to change the case
+    $giftAidCustomGroups = [
+      'gift_aid_declaration' => 'civicrm_value_gift_aid_declaration',
+      'gift_aid' => 'civicrm_value_gift_aid_submission',
+    ];
+    $sql = "UPDATE civicrm_custom_group SET `name`=%1 WHERE `table_name`=%2";
+    foreach ($giftAidCustomGroups as $name => $tableName) {
+      CRM_Core_DAO::executeQuery($sql, [1 => [$name, 'String'], 2 => [$tableName, 'String']]);
+    }
+
+    $giftAidDeclarationFields = [
+      'eligible_for_gift_aid' => 'eligible_for_gift_aid',
+      'address' => 'address',
+      'post_code' => 'post_code',
+      'given_date' => 'given_date',
+      'start_date' => 'start_date',
+      'end_date' => 'end_date',
+      'reason_ended' => 'reason_ended',
+      'source' => 'source',
+      'notes' => 'notes',
+      'scanned_declaration' => 'scanned_declaration',
+    ];
+    $giftAidContributionFields = [
+      'eligible_for_gift_aid' => 'eligible_for_gift_aid',
+      'amount' => 'amount',
+      'gift_aid_amount' => 'gift_aid_amount',
+      'batch_name' => 'batch_name',
+    ];
+    foreach ($giftAidDeclarationFields as $name => $columnName) {
+      CustomField::update(FALSE)
+        ->addValue('name', $name)
+        ->addWhere('column_name', '=', $columnName)
+        ->execute();
+    }
+    foreach ($giftAidContributionFields as $name => $columnName) {
+      CustomField::update(FALSE)
+        ->addValue('name', $name)
+        ->addWhere('column_name', '=', $columnName)
+        ->execute();
+    }
+
+    return TRUE;
+  }
+
   /**
    * Add the specified option group, gracefully if it already exists.
    *
@@ -687,7 +736,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       // For contacts' declarations...
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Eligible_for_Gift_Aid',
+        'name' => 'eligible_for_gift_aid',
         'label' => 'UK Tax Payer?',
         'data_type' => 'Int',
         'html_type' => 'Radio',
@@ -706,7 +755,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Address',
+        'name' => 'address',
         'label' => 'Address',
         'data_type' => 'Memo',
         'html_type' => 'TextArea',
@@ -726,7 +775,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Post_Code',
+        'name' => 'post_code',
         'label' => 'Post Code',
         'data_type' => 'String',
         'html_type' => 'Text',
@@ -756,6 +805,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'is_view' => '0',
         'text_length' => '255',
         'date_format' => 'dd-mm-yy',
+        'time_format' => 2,
         'note_columns' => '60',
         'note_rows' => '4',
         'column_name' => 'given_date',
@@ -763,7 +813,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Start_Date',
+        'name' => 'start_date',
         'label' => 'Start Date',
         'data_type' => 'Date',
         'html_type' => 'Select Date',
@@ -775,6 +825,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'is_view' => '0',
         'text_length' => '255',
         'date_format' => 'dd-mm-yy',
+        'time_format' => 2,
         'note_columns' => '60',
         'note_rows' => '4',
         'column_name' => 'start_date',
@@ -782,7 +833,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'End_Date',
+        'name' => 'end_date',
         'label' => 'End Date',
         'data_type' => 'Date',
         'html_type' => 'Select Date',
@@ -794,6 +845,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'is_view' => '0',
         'text_length' => '255',
         'date_format' => 'dd-mm-yy',
+        'time_format' => 2,
         'note_columns' => '60',
         'note_rows' => '4',
         'column_name' => 'end_date',
@@ -801,7 +853,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Reason_Ended',
+        'name' => 'reason_ended',
         'label' => 'Reason Ended',
         'data_type' => 'String',
         'html_type' => 'Radio',
@@ -820,7 +872,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Source',
+        'name' => 'source',
         'label' => 'Source',
         'data_type' => 'String',
         'html_type' => 'Text',
@@ -838,7 +890,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Notes',
+        'name' => 'notes',
         'label' => 'Notes',
         'data_type' => 'Memo',
         'html_type' => 'TextArea',
@@ -857,7 +909,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->declarationCustomGroupID,
-        'name' => 'Scanned_Declaration',
+        'name' => 'scanned_declaration',
         'label' => 'Scanned Declaration',
         'data_type' => 'File',
         'html_type' => 'File',
@@ -877,7 +929,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       // For Contributions' status
       [
         'custom_group_id' => $this->contributionGiftaidCustomGroupId,
-        'name' => 'Eligible_for_Gift_Aid',
+        'name' => 'eligible_for_gift_aid',
         'label' => 'Eligible for Gift Aid?',
         'data_type' => 'Int',
         'html_type' => 'Radio',
@@ -897,7 +949,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->contributionGiftaidCustomGroupId,
-        'name' => 'Amount',
+        'name' => 'amount',
         'label' => 'Eligible Amount',
         'data_type' => 'Money',
         'html_type' => 'Text',
@@ -915,7 +967,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->contributionGiftaidCustomGroupId,
-        'name' => 'Gift_Aid_Amount',
+        'name' => 'gift_aid_amount',
         'label' => 'Gift Aid Amount',
         'data_type' => 'Money',
         'html_type' => 'Text',
@@ -933,7 +985,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ],
       [
         'custom_group_id' => $this->contributionGiftaidCustomGroupId,
-        'name' => 'Batch_Name',
+        'name' => 'batch_name',
         'label' => 'Batch Name',
         'html_type' => 'Select',
         'default_value' => '',
@@ -1152,7 +1204,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     try {
       civicrm_api3('CustomGroup', 'update', [
         'is_active' => $enable,
-        'id' => CRM_Utils_Array::value('id', civicrm_api3('CustomGroup', 'getsingle', ['name' => 'Gift_Aid'])),
+        'id' => CRM_Utils_Array::value('id', civicrm_api3('CustomGroup', 'getsingle', ['name' => 'gift_aid'])),
       ]);
     }
     catch (Exception $e) {
@@ -1162,7 +1214,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     try {
       civicrm_api3('CustomGroup', 'update', [
         'is_active' => $enable,
-        'id' => CRM_Utils_Array::value('id', civicrm_api3('CustomGroup', 'getsingle', ['name' => 'Gift_Aid_Declaration'])),
+        'id' => CRM_Utils_Array::value('id', civicrm_api3('CustomGroup', 'getsingle', ['name' => 'gift_aid_declaration'])),
       ]);
     }
     catch (Exception $e) {
@@ -1172,7 +1224,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     try {
       civicrm_api3('UFGroup', 'update', [
         'is_active' => $enable,
-        'id' =>  CRM_Utils_Array::value('id',civicrm_api3('UFGroup', 'getsingle', ['name' => 'Gift_Aid'])),
+        'id' =>  CRM_Utils_Array::value('id',civicrm_api3('UFGroup', 'getsingle', ['name' => 'gift_aid'])),
       ]);
     }
     catch (Exception $e) {
@@ -1237,16 +1289,16 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
    * Set the default admin settings for the extension.
    */
   private function setDefaultSettings() {
-    Civi::settings()->set(E::SHORT_NAME . 'globally_enabled', 1);
-    Civi::settings()->set(E::SHORT_NAME . 'financial_types_enabled', []);
+    Civi::settings()->set(E::SHORT_NAME . '_globally_enabled', 1);
+    Civi::settings()->set(E::SHORT_NAME . '_financial_types_enabled', []);
   }
 
   /**
    * Remove the admin settings for the extension.
    */
   private function unsetSettings() {
-    Civi::settings()->revert(E::SHORT_NAME . 'globally_enabled');
-    Civi::settings()->revert(E::SHORT_NAME . 'financial_types_enabled');
+    Civi::settings()->revert(E::SHORT_NAME . '_globally_enabled');
+    Civi::settings()->revert(E::SHORT_NAME . '_financial_types_enabled');
   }
 
   /**

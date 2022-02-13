@@ -124,8 +124,8 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
         }
       }
       // Remove the Gift Aid Batch name filter - it doesn't work and we have batch_id via civicrm_entity_batch which does
-      if (isset($this->_columns['civicrm_value_gift_aid_submission']['filters'][CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')])) {
-        unset($this->_columns['civicrm_value_gift_aid_submission']['filters'][CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')]);
+      if (isset($this->_columns['civicrm_value_gift_aid_submission']['filters'][CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid')])) {
+        unset($this->_columns['civicrm_value_gift_aid_submission']['filters'][CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid')]);
       }
     }
   }
@@ -246,8 +246,8 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
       'eligibleAmount' => 0,
       'giftAidAmount' => 0,
     ];
-    $giftAidEligibleAmountField = 'civicrm_value_gift_aid_submission_' . CRM_Civigiftaid_Utils::getCustomByName('amount', 'Gift_Aid');
-    $giftAidAmountField = 'civicrm_value_gift_aid_submission_' . CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'Gift_Aid');
+    $giftAidEligibleAmountField = 'civicrm_value_gift_aid_submission_' . CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid');
+    $giftAidAmountField = 'civicrm_value_gift_aid_submission_' . CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid');
 
     foreach ($rows as $row) {
       $totals['contribution'] += $row['civicrm_contribution_contribution_amount'];
@@ -364,10 +364,10 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
 
 
       if (array_key_exists('civicrm_address_street_address', $row)) {
-        $address = CRM_Civigiftaid_Declaration::getDonorAddress($row['civicrm_contribution_contact_id'], $row['civicrm_contribution_receive_date']);
-        $rows[$rowNum]['civicrm_address_house'] = $address['house'];
-        $rows[$rowNum]['civicrm_address_street_address'] = $address['address'];
-        $rows[$rowNum]['civicrm_address_postal_code'] = $address['postcode'];
+        $address = CRM_Civigiftaid_Declaration::getDonorAddress($row['civicrm_contribution_contact_id'], $row['civicrm_contribution_contribution_id']);
+        $rows[$rowNum]['civicrm_address_house'] = $address['house'] ?? '';
+        $rows[$rowNum]['civicrm_address_street_address'] = $address['address'] ?? '';
+        $rows[$rowNum]['civicrm_address_postal_code'] = $address['postcode'] ?? '';
       }
 
       // handle Contact Title

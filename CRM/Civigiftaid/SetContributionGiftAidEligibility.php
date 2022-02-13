@@ -62,8 +62,8 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @throws \CiviCRM_API3_Exception
    */
   public static function setGiftAidEligibilityStatus($contributionID, $action = 'edit') {
-    $contributionEligibleGiftAidFieldName = CRM_Civigiftaid_Utils::getCustomByName('Eligible_For_Gift_Aid', 'Gift_Aid');
-    $contributionBatchNameFieldName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid');
+    $contributionEligibleGiftAidFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid');
+    $contributionBatchNameFieldName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid');
 
     $contribution = civicrm_api3('Order', 'getsingle', [
       'id' => $contributionID,
@@ -161,7 +161,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
     try {
       $customGroup = civicrm_api3('CustomGroup', 'getsingle', [
         'return' => ['id'],
-        'name' => 'Gift_Aid_Declaration',
+        'name' => 'gift_aid_declaration',
       ]);
 
       return $customGroup['id'];

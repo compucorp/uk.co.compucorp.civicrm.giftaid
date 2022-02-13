@@ -1,9 +1,10 @@
 <?php
 
+use CRM_Civigiftaid_ExtensionUtil as E;
 use Civi\Api4\Contact;
 use Civi\Api4\Contribution;
+use Civi\Api4\CustomValue;
 use Civi\Api4\PriceFieldValue;
-use CRM_Civigiftaid_ExtensionUtil as E;
 use Civi\Test\HeadlessInterface;
 use Civi\Test\HookInterface;
 use Civi\Test\TransactionalInterface;
@@ -26,7 +27,6 @@ use Civi\Test\TransactionalInterface;
  */
 class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase implements HeadlessInterface, HookInterface {
 
-
   /** @var array */
   protected $contacts = [];
   /** @var array */
@@ -35,53 +35,15 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
   protected $declarations = [];
 
   public function setUpHeadless() {
-    // Civi\Test has many helpers, like install(), uninstall(), sql(), and sqlFile().
-    // See: https://docs.civicrm.org/dev/en/latest/testing/phpunit/#civitest
-
-    // Set to TRUE to force a reset - but your tests will take forever.
-    static $forceResetDatabase = FALSE;
-
-    $return = \Civi\Test::headless()
+    return \Civi\Test::headless()
       ->installMe(__DIR__)
-      ->apply($forceResetDatabase);
-
-    $forceResetDatabase = FALSE;
-    return $return;
+      ->apply();
   }
 
-  public function setUp() {
-    parent::setUp();
-  }
-
-  public function tearDown() {
-    if (!$this->contacts) {
-      return;
-    }
-    $contactIDs = array_keys($this->contacts);
-
-    $contributions = Contribution::get()
-      ->addSelect('id', 'contact_id')
-      ->addWhere('contact_id', 'IN', $contactIDs)
-      ->setCheckPermissions(FALSE)
-      ->execute();
-
-    // Delete contributions
-    if ($contributions) {
-      Contribution::delete()
-        ->addWhere('contact_id', 'IN', $contactIDs)
-        ->setCheckPermissions(FALSE)
-        ->execute();
-    }
-
-    // Delete Contacts
-    Contact::delete()
-      ->addWhere('id', 'IN', array_keys($this->contacts))
-      ->setCheckPermissions(FALSE)
-      ->execute();
-
-    // Financial records? There's probably other stuff left here.
-
-    parent::tearDown();
+  public function setUp(): void {
+    // We use session to store some information on contribution page submission.
+    // eg. "uktaxpayer" controls whether to create a new declaration.
+    CRM_Core_Session::singleton()->reset();
   }
 
   /**
@@ -89,8 +51,7 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
   public function testCreateContribWithApi3SetsCustomData() {
     $this->setupFixture1();
 
-    $contributionGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('Eligible_For_Gift_Aid', 'Gift_Aid');
-    $contactGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('Eligible_For_Gift_Aid', 'Gift_Aid_Declaration');
+    $contributionGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid');
 
     // Create contribution using API3
     $contributionID = civicrm_api3('Contribution', 'create', [
@@ -102,17 +63,16 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
     $this->assertGreaterThan(0, $contributionID);
 
     // Re-fetch the contribution details.
-    $contributions = Contribution::get()
-      ->setCheckPermissions(FALSE)
-      ->addSelect('Gift_Aid.Eligible_for_Gift_Aid', 'Gift_Aid.Amount', 'Gift_Aid.Gift_Aid_Amount', 'Gift_Aid.Batch_Name')
+    $contributions = Contribution::get(FALSE)
+      ->addSelect('gift_aid.eligible_for_gift_aid', 'gift_aid.amount', 'gift_aid.gift_aid_amount', 'gift_aid.batch_name')
       ->addWhere('id', '=', $contributionID)
-      ->execute()[0];
+      ->execute()
+      ->first();
 
-    //$this->dump();
-    $this->assertEquals(1, $contributions['Gift_Aid.Eligible_for_Gift_Aid'] ?? NULL, "Expect contribution to be eligible.");
-    $this->assertEquals('', $contributions['Gift_Aid.Batch_Name'] ?? NULL, "Expected empty batch name");
-    $this->assertEquals(100, $contributions['Gift_Aid.Amount'] ?? NULL, "Expected amount eligible to be calculated");
-    $this->assertEquals(25, $contributions['Gift_Aid.Gift_Aid_Amount'] ?? NULL, "Expected amount claimable to be calculated");
+    $this->assertEquals(1, $contributions['gift_aid.eligible_for_gift_aid'] ?? NULL, "Expect contribution to be eligible.");
+    $this->assertEquals('', $contributions['gift_aid.batch_name'] ?? NULL, "Expected empty batch name");
+    $this->assertEquals(100, $contributions['gift_aid.amount'] ?? NULL, "Expected amount eligible to be calculated");
+    $this->assertEquals(25, $contributions['gift_aid.gift_aid_amount'] ?? NULL, "Expected amount claimable to be calculated");
   }
 
   /**
@@ -125,25 +85,25 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
 
     // Create contribution
     $contributionID = Contribution::create()
-      ->setCheckPermissions(FALSE)
-      ->addValue('contact_id', $this->contacts[0]['id'])
-      ->addValue('financial_type_id', 1)
-      ->addValue('total_amount', 100)
-      ->addValue('Gift_Aid.Eligible_for_Gift_Aid', 1)
-      ->execute()[0]['id'] ?? 0;
+        ->setCheckPermissions(FALSE)
+        ->addValue('contact_id', $this->contacts[0]['id'])
+        ->addValue('financial_type_id', 1)
+        ->addValue('total_amount', 100)
+        ->addValue('gift_aid.eligible_for_gift_aid', 1)
+        ->execute()[0]['id'] ?? 0;
     $this->assertGreaterThan(0, $contributionID);
 
     // Re-fetch the contribution details.
     $contributions = Contribution::get()
       ->setCheckPermissions(FALSE)
-      ->addSelect('Gift_Aid.Eligible_for_Gift_Aid', 'Gift_Aid.Amount', 'Gift_Aid.Gift_Aid_Amount', 'Gift_Aid.Batch_Name')
+      ->addSelect('gift_aid.eligible_for_gift_aid', 'gift_aid.amount', 'gift_aid.gift_aid_amount', 'gift_aid.batch_name')
       ->addWhere('id', '=', $contributionID)
       ->execute()[0];
 
-    $this->assertEquals(1, $contributions['Gift_Aid.Eligible_for_Gift_Aid'] ?? NULL);
-    $this->assertEquals(100, $contributions['Gift_Aid.Amount'] ?? NULL);
-    $this->assertEquals(25, $contributions['Gift_Aid.Gift_Aid_Amount'] ?? NULL);
-    $this->assertEquals('', $contributions['Gift_Aid.Batch_Name'] ?? NULL);
+    $this->assertEquals(1, $contributions['gift_aid.eligible_for_gift_aid'] ?? NULL);
+    $this->assertEquals(100, $contributions['gift_aid.amount'] ?? NULL);
+    $this->assertEquals(25, $contributions['gift_aid.gift_aid_amount'] ?? NULL);
+    $this->assertEquals('', $contributions['gift_aid.batch_name'] ?? NULL);
   }
 
   /**
@@ -173,7 +133,7 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->addValue('contact_id', $this->contacts[0]['id'])
       ->addValue('financial_type_id', $params['financial_type_id'])
       ->addValue('total_amount', 100)
-      // ->addValue('Gift_Aid.Eligible_for_Gift_Aid', 1)
+      // ->addValue('gift_aid.eligible_for_gift_aid', 1)
       ->execute()[0]['id'] ?? 0;
      */
     $this->assertGreaterThan(0, $contributionID);
@@ -181,14 +141,14 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
     // Re-fetch the contribution details.
     $contribution = Contribution::get()
       ->setCheckPermissions(FALSE)
-      ->addSelect('Gift_Aid.Eligible_for_Gift_Aid', 'Gift_Aid.Amount', 'Gift_Aid.Gift_Aid_Amount', 'Gift_Aid.Batch_Name')
+      ->addSelect('gift_aid.eligible_for_gift_aid', 'gift_aid.amount', 'gift_aid.gift_aid_amount', 'gift_aid.batch_name')
       ->addWhere('id', '=', $contributionID)
       ->execute()->first();
 
-    $this->assertEquals($expectations['eligibility'], $contribution['Gift_Aid.Eligible_for_Gift_Aid'] ?? NULL);
-    $this->assertEquals($expectations['eligible_amount'], $contribution['Gift_Aid.Amount'] ?? NULL);
-    $this->assertEquals($expectations['ga_worth'], $contribution['Gift_Aid.Gift_Aid_Amount'] ?? NULL);
-    $this->assertEquals('', $contribution['Gift_Aid.Batch_Name'] ?? NULL);
+    $this->assertEquals($expectations['eligibility'], $contribution['gift_aid.eligible_for_gift_aid'] ?? NULL);
+    $this->assertEquals($expectations['eligible_amount'], $contribution['gift_aid.amount'] ?? NULL);
+    $this->assertEquals($expectations['ga_worth'], $contribution['gift_aid.gift_aid_amount'] ?? NULL);
+    $this->assertEquals('', $contribution['gift_aid.batch_name'] ?? NULL);
   }
 
   /**
@@ -350,14 +310,14 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       // Re-fetch the contribution details.
       $contribution = Contribution::get()
         ->setCheckPermissions(FALSE)
-        ->addSelect('Gift_Aid.Eligible_for_Gift_Aid', 'Gift_Aid.Amount', 'Gift_Aid.Gift_Aid_Amount', 'Gift_Aid.Batch_Name')
+        ->addSelect('gift_aid.eligible_for_gift_aid', 'gift_aid.amount', 'gift_aid.gift_aid_amount', 'gift_aid.batch_name')
         ->addWhere('id', '=', $contributionID)
         ->execute()->first();
 
-      $this->assertEquals(1, $contribution['Gift_Aid.Eligible_for_Gift_Aid'] ?? NULL, $assertionContext);
-      $this->assertEquals($amount, $contribution['Gift_Aid.Amount'] ?? NULL, $assertionContext);
-      $this->assertEquals($amount/4, $contribution['Gift_Aid.Gift_Aid_Amount'] ?? NULL, $assertionContext);
-      $this->assertEquals('', $contribution['Gift_Aid.Batch_Name'] ?? NULL, $assertionContext);
+      $this->assertEquals(1, $contribution['gift_aid.eligible_for_gift_aid'] ?? NULL, $assertionContext);
+      $this->assertEquals($amount, $contribution['gift_aid.amount'] ?? NULL, $assertionContext);
+      $this->assertEquals($amount/4, $contribution['gift_aid.gift_aid_amount'] ?? NULL, $assertionContext);
+      $this->assertEquals('', $contribution['gift_aid.batch_name'] ?? NULL, $assertionContext);
     }
 
     // Delete contributions
@@ -366,6 +326,7 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->setCheckPermissions(FALSE)
       ->execute();
   }
+
   /**
    * Test isContributionEligible.
    *
@@ -374,78 +335,86 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
    * @dataProvider isContributionEligibleCases
    *
    */
-  public function testIsContributionEligible($description, $declarations, $contributions) {
+  public function testIsContributionEligible($description, $declarations, $contribution) {
     $this->setupFixture2();
 
     // Clear static caches.
     unset(Civi::$statics[E::LONG_NAME]); //['updatedDeclarationAmount']);
     unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
 
+    foreach ($declarations as $declarationIndex => $declaration) {
+      foreach ($declaration as $key => $value) {
+        if (in_array($key, ['start_date', 'given_date', 'end_date'])) {
+          unset($declarations[$declarationIndex][$key]);
+          $declarationDates[$declarationIndex][$key] = $value;
+        }
+      }
+    }
     if ($declarations) {
-      \Civi\Api4\CustomValue::save('Gift_Aid_Declaration')
-        ->setCheckPermissions(FALSE)
+      $customValueResults = CustomValue::save('gift_aid_declaration', FALSE)
         ->addDefault('entity_id', $this->contacts[0]['id'])
-        ->addDefault('Address', 'Somewhere')
-        ->addDefault('Post_Code', 'SW1A 0AA')
-        ->addDefault('Source', 'test')
+        ->addDefault('address', 'Somewhere')
+        ->addDefault('post_code', 'SW1A 0AA')
+        ->addDefault('source', 'test')
         ->setRecords($declarations)
         ->execute();
+      $index = 0;
+      foreach ($customValueResults as $customValueResult) {
+        CRM_Civigiftaid_Declaration::fixBrokenApi4CustomValueUpdateDateFields($customValueResult['id'], $declarationDates[$index]);
+        $index++;
+      }
     }
 
-    // create contribution(s)
-    $contributionIDs = [];
-    foreach ($contributions as $orderCreateParams) {
-      // Create contribution with order api
-      // Merge in common fields:
-      $orderCreateParams += [
+    // Create contribution with order api
+    // Merge in common fields:
+    $orderCreateParams = array_merge(
+      [
         'contact_id'             => $this->contacts[0]['id'],
         'total_amount'           => 100,
         'financial_type_id'      => 1,
         'contribution_status_id' => 'Pending',
-      ];
-      $contributionID = civicrm_api3('Order', 'create', $orderCreateParams)['id'] ?? NULL;
-      $contributionIDs[] = $contributionID;
-    }
-    // Flip array so keys are contributionIDs and values are indexes that we can match to the input $contributions;
-    $contributionIDs = array_flip($contributionIDs);
+      ],
+      $contribution,
+    );
+    $contributionID = civicrm_api3('Order', 'create', $orderCreateParams)['id'] ?? NULL;
 
     // test contributions.
     // Get all contributions from found IDs that are not already in a batch
-    $contributionParams = [
-      'id' => ['IN' => $contributionIDs],
-      'return' => [
-        'id',
-        'contact_id',
-        'contribution_status_id',
-        'receive_date',
-        CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Gift_Aid_Amount', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid'),
-      ],
-      'options' => ['limit' => 0],
-    ];
-    $contributionsCreated = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
-    foreach ($contributionsCreated as $contributionID => $contribution) {
-      $result = static::isContributionEligible($contribution);
-      $idx = $contributionIDs[$contributionID];
-      $this->assertEquals($contributions[$idx]['expectedEligibility'], $result,
-        "$description: Error in contribution #$idx."
-      );
+    $contributionCreated = Contribution::get(FALSE)
+      ->addWhere('id', '=', $contributionID)
+      ->addSelect('*', 'custom.*')
+      ->execute()
+      ->first();
+
+    $isEligible = CRM_Civigiftaid_Utils_Contribution::isContributionEligible($contributionCreated);
+    $this->assertEquals($contribution['expectedEligibility'], $isEligible,
+      "$description"
+    );
+    $declaration = CRM_Civigiftaid_Utils_Contribution::getDeclarationForContribution($contributionCreated);
+    $address = CRM_Civigiftaid_Declaration::getDonorAddress($contributionCreated['id']);
+    if ($isEligible) {
+      // Check it.
+      $this->assertNotEquals([], $address, 'Error address empty when it should be full.');
+    }
+    else {
+      // If not eligible we may have an address or not. Either:
+      //   - the contribution is explicitly "not eligible"
+      //   - there is a "no" declaration covering this period.
+      if ($declaration) {
+        $this->assertEquals(0, $declaration['eligible_for_gift_aid'], 'Declaration should be "no"');
+      }
+      else {
+        $this->assertEquals([], $address, 'Error address found when contribution is not eligible.');
+      }
     }
 
     // delete contributions.
     Contribution::delete()
-      ->addWhere('id', 'IN', array_keys($contributionIDs))
+      ->addWhere('id', '=', $contributionID)
       ->setCheckPermissions(FALSE)
       ->execute();
-
-    // delete declarations
-    \Civi\Api4\CustomValue::delete('Gift_Aid_Declaration')
-      ->addWhere('entity_id', '=', $this->contacts[0]['id'])
-      ->execute();
-
   }
+
   /**
    * Data provider for testIsContributionEligible
    *
@@ -467,10 +436,11 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
    * @return Array
    */
   public function isContributionEligibleCases() {
-    // Hardcoded because of classloader issue during testing. CRM_Civigiftaid_Declaration class does not exist yet.
-    $no = 0; // CRM_Civigiftaid_Declaration::DECLARATION_IS_NO;
-    $yes = 1; // CRM_Civigiftaid_Declaration::DECLARATION_IS_YES;
-    $yesPast4 = 3; // CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS;
+    // Classloader has not run when loaded dataProvider.
+    require_once(__DIR__ . '/../../../../../CRM/Civigiftaid/Declaration.php');
+    $no = CRM_Civigiftaid_Declaration::DECLARATION_IS_NO;
+    $yes = CRM_Civigiftaid_Declaration::DECLARATION_IS_YES;
+    $yesPast4 = CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS;
 
     return [
       // Case #0
@@ -478,21 +448,17 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
         'Contribution on a person without declaration',
         [],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-02-01 00:00:00',
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-02-01 00:00:00',
+          'line_items' => [
             [
-              'line_items' => [
+              'line_item' => [
                 [
-                  'line_item' => [
-                    [
-                      'line_total' => 100,
-                      'financial_type_id' => 1,
-                      'price_field_id' => 1,
-                      'qty' =>1
-                    ],
-                  ]
-                ]
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
               ]
             ]
           ]
@@ -504,26 +470,22 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
         'Contribution on a person with a "no" declaration',
         [
           [
-            'start_date' => '2020-02-01',
+            'start_date' => '20200201',
             'eligible_for_gift_aid' => $no
           ]
         ],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-02-01 00:00:00',
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-02-01 00:00:00',
+          'line_items' => [
             [
-              'line_items' => [
+              'line_item' => [
                 [
-                  'line_item' => [
-                    [
-                      'line_total' => 100,
-                      'financial_type_id' => 1,
-                      'price_field_id' => 1,
-                      'qty' => 1
-                    ],
-                  ]
-                ]
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
               ]
             ]
           ]
@@ -535,26 +497,22 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
         'Contribution on a person with yes declaration',
         [
           [
-            'start_date' => '2020-02-01',
+            'start_date' => '20200201',
             'eligible_for_gift_aid' => $yes
           ]
         ],
         [
-          [
-            'expectedEligibility' => TRUE,
-            'receive_date' => '2020-02-01 00:00:00',
+          'expectedEligibility' => TRUE,
+          'receive_date' => '2020-02-01 00:00:00',
+          'line_items' => [
             [
-              'line_items' => [
+              'line_item' => [
                 [
-                  'line_item' => [
-                    [
-                      'line_total' => 100,
-                      'financial_type_id' => 1,
-                      'price_field_id' => 1,
-                      'qty' => 1
-                    ],
-                  ]
-                ]
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
               ]
             ]
           ]
@@ -565,15 +523,27 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution on a person with yes past 4 years declaration',
         [
-          [ 'start_date' => '2020-02-01', 'eligible_for_gift_aid' => $yesPast4 ]
+          [
+            'start_date' => '20200201',
+            'eligible_for_gift_aid' => $yesPast4,
+            'address' => '1 The Street, West Aberdeen',
+            'post_code' => 'AB1 2CD'
+          ]
         ],
         [
-          [
-            'expectedEligibility' => TRUE,
-            'receive_date' => '2020-02-01 00:00:00',
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => TRUE,
+          'receive_date' => '2020-02-01 00:00:00',
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -582,15 +552,25 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution on a person with yes past 4 years declaration, contrib is before date decl. given.',
         [
-          [ 'start_date' => '2020-02-01', 'eligible_for_gift_aid' => $yesPast4 ]
+          [
+            'start_date' => '20200201',
+            'eligible_for_gift_aid' => $yesPast4
+          ]
         ],
         [
-          [
-            'expectedEligibility' => TRUE,
-            'receive_date' => '2018-02-01 00:00:00',
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => TRUE,
+          'receive_date' => '2018-02-01 00:00:00',
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -599,15 +579,25 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution on a person with yes past 4 years declaration, contrib is too old',
         [
-          [ 'start_date' => '2020-02-01', 'eligible_for_gift_aid' => $yesPast4 ]
+          [
+            'start_date' => '20200201',
+            'eligible_for_gift_aid' => $yesPast4
+          ]
         ],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2015-02-01 00:00:00',
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2015-02-01 00:00:00',
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -616,15 +606,25 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution before yes declaration',
         [
-          [ 'start_date' => '2020-02-01', 'eligible_for_gift_aid' => $yes]
+          [
+            'start_date' => '20200201',
+            'eligible_for_gift_aid' => $yes
+          ]
         ],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-01-01 00:00:00',
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-01-01 00:00:00',
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -633,15 +633,26 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution after end date of a yes declaration',
         [
-          [ 'start_date' => '2019-01-01', 'end_date' => '2019-12-01', 'eligible_for_gift_aid' => $yes]
+          [
+            'start_date' => '20190101',
+            'end_date' => '20191201',
+            'eligible_for_gift_aid' => $yes
+          ]
         ],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-01-01 00:00:00',
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-01-01 00:00:00',
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -650,16 +661,31 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution during No period after end date of a yes declaration',
         [
-          [ 'start_date' => '2019-01-01', 'end_date' => '2019-12-01', 'eligible_for_gift_aid' => $yes],
-          [ 'start_date' => '2019-12-01', 'end_date' => '', 'eligible_for_gift_aid' => $no]
+          [
+            'start_date' => '20190101',
+            'end_date' => '20191201',
+            'eligible_for_gift_aid' => $yes
+          ],
+          [
+            'start_date' => '20191201',
+            'end_date' => '',
+            'eligible_for_gift_aid' => $no
+          ]
         ],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-01-01 00:00:00',
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-01-01 00:00:00',
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -668,16 +694,27 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       [
         'Contribution is not of eligible type, but is during Yes period',
         [
-          [ 'start_date' => '2019-01-01', 'end_date' => '', 'eligible_for_gift_aid' => $yes],
+          [
+            'start_date' => '20190101',
+            'end_date' => '',
+            'eligible_for_gift_aid' => $yes
+          ],
         ],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-01-01 00:00:00',
-            'financial_type_id' => 1, // Donation, but line item contradicts.
-            [ 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 100, 'financial_type_id' => 4, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-01-01 00:00:00',
+          'financial_type_id' => 1, // Donation, but line item contradicts.
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 100,
+                  'financial_type_id' => 4,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -687,12 +724,20 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
         'Contribution with zero value',
         [],
         [
-          [
-            'expectedEligibility' => FALSE,
-            'receive_date' => '2020-02-01 00:00:00',
-            [ 'total_amount' => 0, 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 0, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => FALSE,
+          'receive_date' => '2020-02-01 00:00:00',
+          'total_amount' => 0,
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 0,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
@@ -704,19 +749,35 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
           // This 'no' decl has been completely overwritten by a later Yes + 4 one.
           // Note: 'reason_ended' is very much focused on recording why a Yes dec. ended; it does not make sense for
           // why a No declaration ended given the current options (xxx 'declined')
-          [ 'start_date' => '2020-01-01', 'end_date' => '2020-01-01', 'eligible_for_gift_aid' => $no ],
-          [ 'start_date' => '2020-02-22', 'eligible_for_gift_aid' => $yesPast4 ],
+          [
+            'start_date' => '20200101',
+            'end_date' => '20200101',
+            'eligible_for_gift_aid' => $no
+          ],
+          [
+            'start_date' => '20200222',
+            'eligible_for_gift_aid' => $yesPast4
+          ],
         ],
         [
-          [
-            'expectedEligibility' => TRUE,
-            'receive_date' => '2020-01-01 00:00:00',
-            [ 'total_amount' => 0, 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 0, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => TRUE,
+          'receive_date' => '2020-01-01 00:00:00',
+          'total_amount' => 0,
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 0,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
+
       // Case #12
       [
         'Check that a No declaration can be overruled by a later yes past 4 - contribution before No',
@@ -724,92 +785,60 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
           // This 'no' decl has been completely overwritten by a later Yes + 4 one.
           // Note: 'reason_ended' is very much focused on recording why a Yes dec. ended; it does not make sense for
           // why a No declaration ended given the current options (xxx 'declined')
-          [ 'start_date' => '2020-01-01', 'end_date' => '2020-01-01', 'eligible_for_gift_aid' => $no ],
-          [ 'start_date' => '2020-02-22', 'eligible_for_gift_aid' => $yesPast4 ],
+          [
+            'start_date' => '20200101',
+            'end_date' => '20200101',
+            'eligible_for_gift_aid' => $no
+          ],
+          [
+            'start_date' => '20200222',
+            'eligible_for_gift_aid' => $yesPast4
+          ],
         ],
         [
-          [
-            'expectedEligibility' => TRUE,
-            'receive_date' => '2019-01-01 00:00:00',
-            [ 'total_amount' => 0, 'line_items' => [
-                [ 'line_item' => [ [ 'line_total' => 0, 'financial_type_id' => 1, 'price_field_id' => 1, 'qty' =>1 ], ] ]
-            ] ]
+          'expectedEligibility' => TRUE,
+          'receive_date' => '2019-01-01 00:00:00',
+          'total_amount' => 0,
+          'line_items' => [
+            [
+              'line_item' => [
+                [
+                  'line_total' => 0,
+                  'financial_type_id' => 1,
+                  'price_field_id' => 1,
+                  'qty' => 1
+                ],
+              ]
+            ]
           ]
         ]
       ],
     ];
   }
 
-  protected function dump() {
-
-    $customFieldID = CRM_Core_BAO_CustomField::getCustomFieldID('Eligible_for_Gift_Aid', 'Gift_Aid');
-    $customContribTableName = CRM_Core_BAO_CustomField::getTableColumnGroup($customFieldID)[0];
-
-    $dao = CRM_Core_DAO::executeQuery("SELECT id, contact_type, display_name FROM civicrm_contact ORDER BY id");
-    echo "\nContacts:\n";
-    while ($dao->fetch()) {
-      print "  $dao->id: $dao->contact_type $dao->display_name\n";
-    }
-    print "\n";
-    $sql = "
-      SELECT c.id, c.contact_id, c.receive_date, c.total_amount,
-          ga.id ga_id, ga.eligible_for_gift_aid, ga.amount ga_amount, ga.gift_aid_amount, ga.batch_name
-      FROM civicrm_contribution c
-      LEFT JOIN $customContribTableName ga ON ga.entity_id = c.id
-      ORDER BY c.id";
-    $dao = CRM_Core_DAO::executeQuery($sql);
-    echo "\nContributions:\n";
-    while ($dao->fetch()) {
-      $_ = $dao->toArray();
-      foreach ($_ as $k => $v) {
-        print "  $k: " . json_encode($v) ."\n";
-      }
-      print "\n";
-    }
-    print "\n";
-
-
-    $sql = "
-      SELECT *
-      FROM $customContribTableName
-      ORDER BY id";
-    $dao = CRM_Core_DAO::executeQuery($sql);
-    echo "\n$customContribTableName :\n";
-    while ($dao->fetch()) {
-      $_ = $dao->toArray();
-      foreach ($_ as $k => $v) {
-        print "  $k: " . json_encode($v) ."\n";
-      }
-      print "\n";
-    }
-    print "\n";
-
-  }
   /**
    */
   protected function setupFixture1() {
-
     $this->setupFixture2();
     $contactID = $this->contacts[0]['id'];
 
     // Create a declaration for this contact.
-    // Nb. as of CiviCRM 5.25 this API doesn't return anything useful like the ID of the created declaration.
-    \Civi\Api4\CustomValue::create('Gift_Aid_Declaration')
+    $customValueID = CustomValue::create('gift_aid_declaration', FALSE)
       ->addValue('entity_id', $contactID)
-      ->addValue('Eligible_for_Gift_Aid', 1)
-      ->addValue('Address', 'somewhere')
-      ->addValue('Post_Code', 'SW1A 0AA')
-      ->addValue('Start_Date', '2020-01-01')
-      ->addValue('Source', 'test 1')
-      ->execute();
-
+      ->addValue('eligible_for_gift_aid', 1)
+      ->addValue('address', 'somewhere')
+      ->addValue('post_code', 'SW1A 0AA')
+      //->addValue('start_date', '20200101')
+      ->addValue('source', 'test 1')
+      ->execute()
+      ->first()['id'];
+    CRM_Civigiftaid_Declaration::fixBrokenApi4CustomValueUpdateDateFields($customValueID, ['start_date' => '20200101']);
   }
 
   /**
    * Create a contact and check some assumptions.
    */
   protected function setupFixture2() {
-
     $r = civicrm_api3('FinancialType', 'get', []);
     $this->assertEquals('Donation', $r['values'][1]['name'], "Test assumes fin type 1 is donation but it is not.");
     $this->assertEquals('Event Fee', $r['values'][4]['name'], "Test assumes fin type 4 is event fee but it is not.");
@@ -820,16 +849,13 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->addValue('amount', 1)
       ->execute();
 
-    // Mark Donation as an eligible type, (and event fee as not), and globally eligible for now.
-    //$financialTypesAvailable = (Array) CRM_Civigiftaid_Settings::get('financial_types_enabled');
-    CRM_Civigiftaid_Settings::save([
-      'globally_enabled' => 1,
-      'financial_types_enabled' => [1], // Just donations.
-    ]);
+    // Mark Donation as an eligible type, (and event fee as not).
+    \Civi::settings()->set('civigiftaid_globally_enabled', 0);
+    // Just donations.
+    \Civi::settings()->set('civigiftaid_financial_types_enabled', [1]);
 
     // Create a contact.
-    $result = Contact::create()
-      ->setCheckPermissions(FALSE)
+    $result = Contact::create(FALSE)
       ->addValue('contact_type', 'Individual')
       ->addValue('display_name', 'Test 123')
       ->execute()[0];

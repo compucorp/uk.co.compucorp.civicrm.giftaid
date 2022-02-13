@@ -65,34 +65,29 @@ function _civicrm_api3_gift_aid_updateeligiblecontributions_spec(&$params) {
  * @throws \CiviCRM_API3_Exception
  */
 function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
-  $customBatchName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid');
-  $customEligible = CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid');
-
   $params['options']['limit'] = $params['options']['limit'] ?? 0;
 
-  $contributionParams = [
-    'return' => [
-      'id',
-      'contact_id',
-      'contribution_status_id',
-      'receive_date',
-      $customBatchName,
-      $customEligible,
-    ],
-    'options' => $params['options'],
-  ];
+  $contributions = \Civi\Api4\Contribution::get(FALSE)
+    ->addSelect('*', 'custom.*');
+
   if (empty($params['recalculate_amount'])) {
     // Only retrieve contributions that do not have eligibility set
-    $contributionParams[$customEligible] = ['IS NULL' => 1];
+    $contributions->addWhere('gift_aid.eligible_for_gift_aid', 'IS NULL');
   }
   else {
     // Retrieve all contributions that are eligible for gift aid
-    $contributionParams[$customEligible] = 1;
+    $contributions->addWhere('gift_aid.eligible_for_gift_aid', '=', 1);
   }
   if (!empty($params['contribution_id'])) {
-    $contributionParams['id'] = $params['contribution_id'];
+    $contributions->addWhere('id', '=', $params['contribution_id']);
   }
-  $contributions = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
+  if (!empty($params['options']['limit'])) {
+    $contributions->setLimit($params['options']['limit']);
+  }
+  if (!empty($params['options']['offset'])) {
+    $contributions->setLimit($params['options']['offset']);
+  }
+  $contributions->execute()->indexBy('id');
   if (empty($contributions)) {
     return civicrm_api3_create_error('No contributions found or all have Eligible flag set!');
   }
@@ -108,7 +103,7 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   try {
     foreach ($contributions as $contributionID => $contributionDetail) {
       // Check batch name here because it may be NULL or empty string and we can't check that using API3.
-      if (!empty($contributionDetail[$customBatchName])) {
+      if (!empty($contributionDetail['gift_aid.batch_name'])) {
         // Contribution is part of a batch so we must not change/process it.
         continue;
       }
@@ -141,30 +136,24 @@ function _civicrm_api3_gift_aid_recalculatecontributionamounts_spec(&$params) {
 }
 
 function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
-  $customBatchName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid');
-  $customEligible = CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid');
-
   $params['options']['limit'] = $params['options']['limit'] ?? 0;
 
-  $contributionParams = [
-    'return' => [
-      'id',
-      'contact_id',
-      'contribution_status_id',
-      'receive_date',
-      $customBatchName,
-      $customEligible,
-    ],
-    'options' => $params['options'],
-  ];
+  $contributions = \Civi\Api4\Contribution::get(FALSE)
+    ->addSelect('*', 'custom.*');
+  if (!empty($params['options']['limit'])) {
+    $contributions->setLimit($params['options']['limit']);
+  }
+  if (!empty($params['options']['offset'])) {
+    $contributions->setLimit($params['options']['offset']);
+  }
 
   // Retrieve all contributions that are eligible for gift aid
-  $contributionParams[$customEligible] = 1;
+  $contributions->addWhere('gift_aid.eligible_for_gift_aid', '=', 1);
 
   if (!empty($params['contribution_id'])) {
-    $contributionParams['id'] = $params['contribution_id'];
+    $contributions->addWhere('id', '=', $params['contribution_id']);
   }
-  $contributions = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
+  $contributions->execute()->indexBy('id');
   if (empty($contributions)) {
     return civicrm_api3_create_error('No contributions found or none have Eligible flag set!');
   }
@@ -180,17 +169,17 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   try {
     foreach ($contributions as $contributionID => $contributionDetail) {
       // Check batch name here because it may be NULL or empty string and we can't check that using API3.
-      if (!empty($params['batch_name']) && ($params['batch_name'] !== $contributionDetail[$customBatchName])) {
+      if (!empty($params['batch_name']) && ($params['batch_name'] !== $contributionDetail['gift_aid.batch_name'])) {
         // We specified a specific batch name to process and this contribution is not part of that batch
         continue;
       }
-      elseif (empty($params['batch_name']) && !empty($contributionDetail[$customBatchName])) {
+      elseif (empty($params['batch_name']) && !empty($contributionDetail['gift_aid.batch_name'])) {
         // Contribution is part of a batch so we must not change/process it.
         continue;
       }
       CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID,
-        $contributionDetail[$customEligible],
-        $contributionDetail[$customBatchName],
+        $contributionDetail['gift_aid.eligible_for_gift_aid'],
+        $contributionDetail['gift_aid.batch_name'],
         TRUE
       );
       $updatedIDs[] = $contributionID;

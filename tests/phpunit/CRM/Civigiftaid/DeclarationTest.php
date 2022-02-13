@@ -34,57 +34,16 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
   protected $declarations = [];
 
   public function setUpHeadless() {
-    // Civi\Test has many helpers, like install(), uninstall(), sql(), and sqlFile().
-    // See: https://docs.civicrm.org/dev/en/latest/testing/phpunit/#civitest
-
-    // Set to TRUE to force a reset - but your tests will take forever.
-    static $forceResetDatabase = FALSE;
-
-    $r = \Civi\Test::headless()
+    return \Civi\Test::headless()
       ->installMe(__DIR__)
-      ->apply($forceResetDatabase);
-
-    // At most do this once.
-    $forceResetDatabase = FALSE;
-    return $r;
+      ->apply();
   }
 
-  public function setUp() {
+  public function setUp(): void {
     parent::setUp();
 
     // This is common to all tests.
     $this->setupFixture1();
-  }
-
-  public function tearDown() {
-    if (!$this->contacts) {
-      return;
-    }
-    $contactIDs = array_keys($this->contacts);
-
-    $contributions = Contribution::get()
-      ->addSelect('id', 'contact_id')
-      ->addWhere('contact_id', 'IN', $contactIDs)
-      ->setCheckPermissions(FALSE)
-      ->execute();
-
-    // Delete contributions
-    if ($contributions) {
-      Contribution::delete()
-        ->addWhere('contact_id', 'IN', $contactIDs)
-        ->setCheckPermissions(FALSE)
-        ->execute();
-    }
-
-    // Delete Contacts
-    Contact::delete()
-      ->addWhere('id', 'IN', array_keys($this->contacts))
-      ->setCheckPermissions(FALSE)
-      ->execute();
-
-    // Financial records? There's probably other stuff left here.
-
-    parent::tearDown();
   }
 
   /**
@@ -112,23 +71,21 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
                CRM_Civigiftaid_Declaration::DECLARATION_IS_YES => 'Yes',
                CRM_Civigiftaid_Declaration::DECLARATION_IS_NO => 'No',
                CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS => 'Yes and past 4',
-             ] as $type=>$assertionContext) {
+             ] as $type => $assertionContext) {
 
       $session->set('uktaxpayer', $type, E::LONG_NAME);
       $assertionContext = "During '$assertionContext' declaration test round";
-      // Clear static cahces.
+      // Clear static caches.
       unset(Civi::$statics[E::LONG_NAME]); //['updatedDeclarationAmount']);
       unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
 
-      // Create the contribution which should trigger storing a declaration.
-
       // Create (eligible) contribution
-      $contributionID = Contribution::create()
-          ->setCheckPermissions(FALSE)
-          ->addValue('contact_id', $this->contacts[0]['id'])
-          ->addValue('financial_type_id', 1)
-          ->addValue('total_amount', 100)
-          ->execute()[0]['id'] ?? 0;
+      $contributionID = Contribution::create(FALSE)
+        ->addValue('contact_id', $this->contacts[0]['id'])
+        ->addValue('financial_type_id', 1)
+        ->addValue('total_amount', 100)
+        ->execute()
+        ->first()['id'] ?? 0;
       $this->assertGreaterThan(0, $contributionID, $assertionContext);
 
       // Check for declarations.
@@ -154,18 +111,9 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       $this->assertEmpty($decl['notes'], $assertionContext);
       $this->assertEquals('testDeclarationUpdate', $decl['source'], $assertionContext);
 
-      // End of test, clean up:
-
-      // Delete the contribution
-      Contribution::delete()
-        ->setCheckPermissions(FALSE)
-        ->addWhere('id', '=', $contributionID)
-        ->execute();
-
-      // Delete the declaration.
-      CustomValue::delete('Gift_Aid_Declaration')
-        ->setCheckPermissions(FALSE)
-        ->addWhere('id', '=', $decl['id'])
+      // Cleanup for next round of foreach
+      \Civi\Api4\CustomValue::delete('gift_aid_declaration', FALSE)
+        ->addWhere('id', '=', $declarations[0]['id'])
         ->execute();
     }
 
@@ -246,20 +194,19 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     // End of test, clean up:
 
     // Delete the declaration.
-    CustomValue::delete('Gift_Aid_Declaration')
+    CustomValue::delete('gift_aid_declaration')
       ->setCheckPermissions(FALSE)
       ->addWhere('id', 'IN', $declarationsToDelete)
       ->execute();
 
   }
   public function logicTestProvider() {
-    require_once('CRM/Civigiftaid/Declaration.php');
     $no = CRM_Civigiftaid_Declaration::DECLARATION_IS_NO;
     $yes = CRM_Civigiftaid_Declaration::DECLARATION_IS_YES;
     $yesPast4 = CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS;
     return [
       [
-        'existing no, adding a yes (also tests ommitted given_date and provided given_date)',
+        'existing no, adding a yes (also tests omitted given_date and provided given_date)',
         [
           ['start_date' => '2020-01-01 00:00:00', 'eligible_for_gift_aid' => $no],
           ['start_date' => '2020-05-01 00:00:00', 'given_date' => '2020-04-01 00:00:00', 'eligible_for_gift_aid' => $yes],
@@ -329,7 +276,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       ],
 
       [
-        'existing yes, adding a yes past 4, but existing declr is older than 4 years ago',
+        'existing yes, adding a yes past 4, but existing declaration is older than 4 years ago',
         [
           // This start date is definitely over 4 years ago!
           ['start_date' => '2012-01-01', 'eligible_for_gift_aid' => $yes],
@@ -343,7 +290,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
 
       [
-        'existing yes, adding a yes past 4, but existing declr is not older than 4 years ago',
+        'existing yes, adding a yes past 4, but existing declaration is not older than 4 years ago',
         [
           // This start date needs to be relevant to actually NOW, since that's the way
           // the code is written (@todo open issue on this).
@@ -358,8 +305,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
   }
 
   protected function dump() {
-
-    $customFieldID = CRM_Core_BAO_CustomField::getCustomFieldID('Eligible_for_Gift_Aid', 'Gift_Aid');
+    $customFieldID = CRM_Core_BAO_CustomField::getCustomFieldID('eligible_for_gift_aid', 'gift_aid');
     $customContribTableName = CRM_Core_BAO_CustomField::getTableColumnGroup($customFieldID)[0];
 
     $dao = CRM_Core_DAO::executeQuery("SELECT id, contact_type, display_name FROM civicrm_contact ORDER BY id");
@@ -405,7 +351,6 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
   /**
    */
   protected function setupFixture1() {
-
     $r = civicrm_api3('FinancialType', 'get', []);
     $this->assertEquals('Donation', $r['values'][1]['name'], "Test assumes fin type 1 is donation but it is not.");
     $this->assertEquals('Event Fee', $r['values'][4]['name'], "Test assumes fin type 4 is event fee but it is not.");
@@ -418,28 +363,11 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     ]);
 
     // Create a contact.
-    $result = Contact::create()
-      ->setCheckPermissions(FALSE)
+    $this->contacts[] = Contact::create(FALSE)
       ->addValue('contact_type', 'Individual')
       ->addValue('display_name', 'Test 123')
-      ->execute()[0];
-    $this->contacts[] = $result;
-    $contactID = $this->contacts[0]['id'];
-    return;
-
-    /*
-    // Create a declaration for this contact.
-    // Nb. as of CiviCRM 5.25 this API doesn't return anything useful like the ID of the created declaration.
-    \Civi\Api4\CustomValue::create('Gift_Aid_Declaration')
-      ->addValue('entity_id', $contactID)
-      ->addValue('Eligible_for_Gift_Aid', 1)
-      ->addValue('Address', 'somewhere')
-      ->addValue('Post_Code', 'SW1A 0AA')
-      ->addValue('Start_Date', '2020-01-01')
-      ->addValue('Source', 'test 1')
-      ->execute();
-
-     */
+      ->execute()
+      ->first();
   }
 
 }

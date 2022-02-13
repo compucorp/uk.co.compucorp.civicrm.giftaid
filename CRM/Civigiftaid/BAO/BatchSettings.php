@@ -58,10 +58,10 @@ class CRM_Civigiftaid_BAO_BatchSettings extends CRM_Civigiftaid_DAO_BatchSetting
    */
   private static function addDefaults(&$params) {
     if (!isset($params['financial_types_enabled'])) {
-      $params['financial_types_enabled'] = (array) CRM_Civigiftaid_Settings::getValue('financial_types_enabled');
+      $params['financial_types_enabled'] = \Civi::settings()->get('civigiftaid_financial_types_enabled');
     }
     if (!isset($params['globally_enabled'])) {
-      $params['globally_enabled'] = (bool) CRM_Civigiftaid_Settings::getValue('globally_enabled');
+      $params['globally_enabled'] = \Civi::settings()->get('civigiftaid_globally_enabled');
     }
     if (!isset($params['basic_rate_tax'])) {
       $params['basic_rate_tax'] = CRM_Civigiftaid_Utils_Contribution::getBasicRateTax();

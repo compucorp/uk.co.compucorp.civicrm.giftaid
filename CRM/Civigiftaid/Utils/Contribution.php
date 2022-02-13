@@ -9,6 +9,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\Contribution;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -38,23 +39,13 @@ class CRM_Civigiftaid_Utils_Contribution {
     ]);
 
     // Get all contributions from found IDs that are not already in a batch
-    $contributionParams = [
-      'id' => ['IN' => $contributionIDs],
-      'return' => [
-        'id',
-        'contact_id',
-        'contribution_status_id',
-        'receive_date',
-        CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')],
-      'options' => ['limit' => 0],
-    ];
-    $contributions = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
+    $contributions = Contribution::get(FALSE)
+      ->addWhere('id', 'IN', $contributionIDs)
+      ->addSelect('*', 'custom.*')
+      ->execute();
     foreach ($contributions as $contribution) {
       // check if the selected contribution id already in a batch
-      if (!empty($contribution[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')])) {
+      if (!empty($contribution['gift_aid.batch_name'])) {
         $contributionsNotAdded[] = $contribution['id'];
         continue;
       }
@@ -111,25 +102,25 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
 
     if ($batchName !== NULL) {
-      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')] = $batchName;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid')] = $batchName;
     }
     if (isset($eligibleForGiftAid)) {
       $eligibleForGiftAid = (int) $eligibleForGiftAid;
-      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid')] = $eligibleForGiftAid;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
       if ($eligibleForGiftAid === 0) {
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'Gift_Aid')] = NULL;
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'Gift_Aid')] = NULL;
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = NULL;
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = NULL;
       }
       else {
         // Eligible - calculate gift aid amounts
-        $totalAmount = (float) civicrm_api3('Contribution', 'getvalue', [
-          'return' => "total_amount",
-          'id' => $contributionID,
-        ]);
+        $totalAmount = Contribution::get(FALSE)
+          ->addWhere('id', '=', $contributionID)
+          ->execute()
+          ->first()['total_amount'];
         $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
         $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'Gift_Aid')] = $giftAidAmount;
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'Gift_Aid')] = $giftAidableContribAmt;
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = $giftAidAmount;
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = $giftAidableContribAmt;
       }
     }
     $contributionParams['entity_id'] = $contributionID;
@@ -161,15 +152,10 @@ class CRM_Civigiftaid_Utils_Contribution {
         $batchContribution->batch_id = $contribution['batch_id'];
         $batchContribution->delete();
 
-        $groupID = civicrm_api3('CustomGroup', 'getvalue', [
-          'return' => "id",
-          'name' => "gift_aid",
-        ]);
-        $contributionParams = [
-          'id' => $contribution['contribution_id'],
-          CRM_Civigiftaid_Utils::getCustomByName('batch_name', $groupID) => 'null',
-        ];
-        civicrm_api3('Contribution', 'create', $contributionParams);
+        Contribution::update(FALSE)
+          ->addWhere('id', '=', $contribution['contribution_id'])
+          ->addValue('gift_aid.batch_name', NULL)
+          ->execute();
         $contributionIDsRemoved[] = $contribution['contribution_id'];
       }
       else {
@@ -197,10 +183,11 @@ class CRM_Civigiftaid_Utils_Contribution {
     $sql = "
       SELECT SUM(line_total) total
       FROM civicrm_line_item
-      WHERE contribution_id = {$contributionId}";
+      WHERE contribution_id = %1";
+    $sqlParams = [1 => [$contributionId, 'Int']];
 
-    if (!(bool) CRM_Civigiftaid_Settings::getValue('globally_enabled')) {
-      $enabledTypes = (array) CRM_Civigiftaid_Settings::getValue('financial_types_enabled');
+    if (!(bool) \Civi::settings()->get('civigiftaid_globally_enabled')) {
+      $enabledTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
       if (empty($enabledTypes)) {
         // if no financial types are selected
         return 0;
@@ -209,7 +196,7 @@ class CRM_Civigiftaid_Utils_Contribution {
       $sql .= " AND financial_type_id IN ({$enabledTypesStr})";
     }
 
-    $dao = CRM_Core_DAO::executeQuery($sql);
+    $dao = CRM_Core_DAO::executeQuery($sql, $sqlParams);
     if ($dao->fetch()) {
       return (float) $dao->total;
     }
@@ -348,28 +335,19 @@ class CRM_Civigiftaid_Utils_Contribution {
     $contributionsAlreadyAdded = [];
 
     // Get all contributions from found IDs that are not already in a batch
-    $contributionParams = [
-      'id' => ['IN' => $contributionIDs],
-      'return' => [
-        'id',
-        'contact_id',
-        'contribution_status_id',
-        'receive_date',
-        CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Gift_Aid_Amount', 'Gift_Aid'),
-        CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid'),
-      ],
-      'receive_date' => ['<=' => 'now'],
-      'options' => ['limit' => 0],
-    ];
-    $contributions = civicrm_api3('Contribution', 'get', $contributionParams)['values'];
+    $contributions = Contribution::get(FALSE)
+      ->addSelect('*', 'custom.*')
+      ->addWhere('id', 'IN', $contributionIDs)
+      ->addWhere('receive_date', '<=', 'now')
+      ->execute()
+      ->indexBy('id')
+      ->getArrayCopy();
 
     // Add contribution IDs that were not matched (eg. receive_date is in the future)
     $contributionsNotValid = array_diff($contributionIDs, array_keys($contributions));
 
     foreach ($contributions as $contribution) {
-      if (!empty($contribution[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'Gift_Aid')])) {
+      if (!empty($contribution['gift_aid.batch_name'])) {
         $contributionsAlreadyAdded[] = $contribution['id'];
       }
       elseif (self::isEligibleForGiftAid($contribution)
@@ -539,8 +517,8 @@ class CRM_Civigiftaid_Utils_Contribution {
       WHERE i.contribution_id IN (%1)";
     $queryParams[1] = [$contributionIdStr, 'CommaSeparatedIntegers'];
 
-    if (!(bool) CRM_Civigiftaid_Settings::getValue('globally_enabled')) {
-      $enabledTypes = (array) CRM_Civigiftaid_Settings::getValue('financial_types_enabled');
+    if (!\Civi::settings()->get('civigiftaid_globally_enabled')) {
+      $enabledTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
       if (empty($enabledTypes)) {
         // if no financial types are selected
         return $contributionDetails;
@@ -564,7 +542,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @return float|int
    */
   private static function getGiftAidableContribAmt($contributionAmt, $contributionID) {
-    if ((bool) CRM_Civigiftaid_Settings::getValue('globally_enabled')) {
+    if (\Civi::settings()->get('civigiftaid_globally_enabled')) {
       return $contributionAmt;
     }
     return self::getContribAmtForEnabledFinanceTypes($contributionID);
@@ -614,13 +592,13 @@ class CRM_Civigiftaid_Utils_Contribution {
 
   /**
    * @param int $contactId
-   * @param string $dateRange
+   * @param array $dateRange
    *
    * @return mixed
    * @throws \CiviCRM_API3_Exception
    */
   public static function getContributionsByDateRange($contactId, $dateRange) {
-    if ((bool) CRM_Civigiftaid_Settings::getValue('globally_enabled')) {
+    if (\Civi::settings()->get('civigiftaid_globally_enabled')) {
       $result = civicrm_api3('Contribution', 'get', [
         'sequential' => 1,
         'return' => "financial_type_id,id",
@@ -630,7 +608,7 @@ class CRM_Civigiftaid_Utils_Contribution {
       ]);
     }
     else {
-      if ($financialTypes = (array) CRM_Civigiftaid_Settings::getValue('financial_types_enabled')) {
+      if ($financialTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled')) {
         $result = civicrm_api3('Contribution', 'get', [
           'sequential' => 1,
           'return' => "financial_type_id,id",
@@ -662,33 +640,31 @@ class CRM_Civigiftaid_Utils_Contribution {
   }
 
   /**
-   * Check if Eligibility criteria for Contribution is met.
-   *
    * @param array $contribution
    *
-   * @return bool
-   * @throws \CiviCRM_API3_Exception
+   * @return array|NULL
+   * @throws \Exception
    */
-  public static function isContributionEligible($contribution) {
+  public static function getDeclarationForContribution(array $contribution) {
     $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contribution['contact_id']);
     if (empty($declarations)) {
-      return FALSE;
+      return NULL;
     }
 
     // If contribution is marked as not eligible for gift-aid it is not eligible..
-    if (!(bool) $contribution[CRM_Civigiftaid_Utils::getCustomByName('Eligible_for_Gift_Aid', 'Gift_Aid')]) {
+    if (!(bool) $contribution['gift_aid.eligible_for_gift_aid']) {
       // Contribution marked as not eligible
-      return FALSE;
+      return NULL;
     }
 
-    $eligibleAmount = $contribution[CRM_Civigiftaid_Utils::getCustomByName('Amount', 'Gift_Aid')];
+    $eligibleAmount = $contribution['gift_aid.amount'];
     if (!empty($eligibleAmount) && ($eligibleAmount == 0)) {
       // Contribution has 0 eligible amount.
-      return FALSE;
+      return NULL;
     }
 
     foreach ($declarations as $declaration) {
-      if ($declaration['eligible_for_gift_aid'] == CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS) {
+      if ($declaration['eligible_for_gift_aid'] === CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS) {
         $declaration['start_date'] = self::dateFourYearsAgo($declaration['start_date']);
       }
 
@@ -708,9 +684,24 @@ class CRM_Civigiftaid_Utils_Contribution {
         $contributionDeclarationDateMatchFound = ($contributionDateTS >= $startDateTS);
       }
 
-      if ($contributionDeclarationDateMatchFound == TRUE) {
-        return ((bool) $declaration['eligible_for_gift_aid']);
+      if ($contributionDeclarationDateMatchFound === TRUE) {
+        return $declaration;
       }
+    }
+    return NULL;
+  }
+
+  /**
+   * Check if Eligibility criteria for Contribution is met.
+   *
+   * @param array $contribution
+   *
+   * @return bool
+   */
+  public static function isContributionEligible(array $contribution): bool {
+    $declaration = self::getDeclarationForContribution($contribution);
+    if ($declaration) {
+      return (bool) $declaration['eligible_for_gift_aid'];
     }
     return FALSE;
   }
