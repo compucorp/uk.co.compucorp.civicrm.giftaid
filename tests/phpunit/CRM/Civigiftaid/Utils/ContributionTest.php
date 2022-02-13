@@ -40,6 +40,12 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->apply();
   }
 
+  public function setUp(): void {
+    // We use session to store some information on contribution page submission.
+    // eg. "uktaxpayer" controls whether to create a new declaration.
+    CRM_Core_Session::singleton()->reset();
+  }
+
   /**
    */
   public function testCreateContribWithApi3SetsCustomData() {
@@ -320,6 +326,7 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->setCheckPermissions(FALSE)
       ->execute();
   }
+
   /**
    * Test isContributionEligible.
    *
@@ -406,13 +413,8 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->addWhere('id', '=', $contributionID)
       ->setCheckPermissions(FALSE)
       ->execute();
-
-    // delete declarations
-    CustomValue::delete('gift_aid_declaration')
-      ->addWhere('entity_id', '=', $this->contacts[0]['id'])
-      ->execute();
-
   }
+
   /**
    * Data provider for testIsContributionEligible
    *

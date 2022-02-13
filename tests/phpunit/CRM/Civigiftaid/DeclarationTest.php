@@ -46,10 +46,6 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
     $this->setupFixture1();
   }
 
-  public function tearDown(): void {
-    parent::tearDown();
-  }
-
   /**
    * CRM_Civigiftaid_Declaration::update is called by the hook_post callback
    * for contributions, and then it calls setDeclaration which makes several
