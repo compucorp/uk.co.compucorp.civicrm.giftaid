@@ -150,6 +150,16 @@ function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
 }
 
 /**
+ * Implements hook_civicrm_check().
+ *
+ * @throws \CiviCRM_API3_Exception
+ */
+function civigiftaid_civicrm_check(&$messages) {
+  $checks = new CRM_Civigiftaid_Check($messages);
+  $messages = $checks->checkRequirements();
+}
+
+/**
  * @param $objectType
  * @param $tasks
  */
