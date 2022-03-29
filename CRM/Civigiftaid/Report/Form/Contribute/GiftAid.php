@@ -13,6 +13,9 @@ use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
  * Class CRM_Civigiftaid_Report_Form_Contribute_GiftAid
+ *
+ * Create report in the right format to submit to HMRC.
+ * See https://www.gov.uk/guidance/schedule-spreadsheet-to-claim-back-tax-on-gift-aid-donations for requirements
  */
 class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
 
@@ -60,6 +63,12 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
             'title'      => E::ts('Last Name'),
             'no_display' => FALSE,
             'required'   => TRUE,
+          ],
+        ],
+        'order_bys' => [
+          'sort_name' => [
+            'title' => E::ts('Contact Name (in sort format)'),
+            'default' => TRUE,
           ],
         ],
       ],
@@ -112,6 +121,12 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
       ],
     ];
 
+    $this->_options = [
+      'summarise_by_contact' => [
+        'title' => E::ts('Summarise by contact'),
+        'type' => 'checkbox',
+      ],
+    ];
     parent::__construct();
 
     // set defaults
@@ -134,6 +149,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
     $select = [];
 
     $this->_columnHeaders = [];
+    $summarise = array_key_exists('summarise_by_contact', $this->_params) && !empty($this->_params['summarise_by_contact']['summarise_by_contact']);
     foreach ($this->_columns as $tableName => $table) {
       if (array_key_exists('fields', $table)) {
         foreach ($table['fields'] as $fieldName => $field) {
@@ -184,7 +200,17 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
               }
             }
             else {
-              $select[] = "{$field['dbAlias']} as {$tableName}_{$fieldName}";
+              // sum amount & gift_aid_amount if summarising
+              if ($summarise && $tableName == 'civicrm_value_gift_aid_submission' && ($field['name'] == 'amount' || $field['name'] == 'gift_aid_amount')) {
+                $select[] = "SUM({$field['dbAlias']}) as {$tableName}_{$fieldName}";
+              }
+              // use the latest contribution date if summarising
+              elseif ($summarise && $tableName == 'civicrm_contribution' && $fieldName == 'receive_date') {
+                $select[] = "MAX({$field['dbAlias']}) as {$tableName}_{$fieldName}";
+              }
+              else {
+                $select[] = "{$field['dbAlias']} as {$tableName}_{$fieldName}";
+              }
               $this->_columnHeaders["{$tableName}_{$fieldName}"]['title'] =
                 $field['title'];
               $this->_columnHeaders["{$tableName}_{$fieldName}"]['type'] =
@@ -236,6 +262,16 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
       $this->_whereClauses[] = "{$this->_aliases['civicrm_entity_batch']}.batch_id IN ({$this->get('batchID')})";
     }
     parent::where();
+  }
+
+  public function groupBy() {
+    parent::groupBy();
+    if (array_key_exists('summarise_by_contact', $this->_params) && !empty($this->_params['summarise_by_contact']['summarise_by_contact'])) {
+      // NB: ideally we would group by contact_id AND the declaration address.  But we have a hacky arrangement selecting the current address
+      // from civicrm_address and then replacing it with the declaration address in alterDisplay() so we can't group by it.
+      // HMRC guidance is not specific so hopefully this doesn't actually matter.
+      $this->_groupBy = "GROUP BY {$this->_aliases['civicrm_contribution']}.contact_id";
+    }
   }
 
   public function statistics(&$rows) {
