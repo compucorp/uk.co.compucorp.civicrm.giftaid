@@ -9,6 +9,17 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.5
+
+* Fix GiftAid report fatal error.
+* [!28](https://lab.civicrm.org/extensions/ukgiftaid/-/merge_requests/28) Add options to summarise by contact and sort by sort_name.
+* Add system check for version if ukgiftaidonline is installed.
+* Clear session data when running each test.
+* API4 conversion.
+* Standardise on lowercase names for custom fields.
+* Use shared function to get addresses from gift aid declaration.
+* phpunit8 compatibility for tests.
+
 ## Release 3.4.9
 
 * Remove broken `GiftAid.Makepastyearsubmissions` scheduled job (the API call was actually removed a year ago).
