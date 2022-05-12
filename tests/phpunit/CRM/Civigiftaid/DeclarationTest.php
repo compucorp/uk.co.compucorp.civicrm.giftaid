@@ -146,7 +146,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       // Clear static caches.
       unset(Civi::$statics[E::LONG_NAME]); //['updatedDeclarationAmount']);
       unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
-      // Fix annoying date format thing.
+      // Convert date formats from ISO (Y-m-d H:i:s) to MySQL style (YmdHis)
       foreach (['start_date', 'end_date', 'given_date'] as $_) {
         if (!empty($declaration[$_])) {
           $declaration[$_] = preg_replace('/[^0-9]/', '', $declaration[$_]);
@@ -186,7 +186,13 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
         }
         else {
           // Simple comparison.
-          $this->assertEquals($value, $declaration[$key] ?? '(MISSING)', "$testDescription: Expect declr $i to have $key = $value");
+          if ($value === '') {
+            // Allow '' === undefined.
+            $this->assertEquals($value, $declaration[$key] ?? '', "$testDescription: Expect declr $i to have $key = ''");
+          }
+          else {
+            $this->assertEquals($value, $declaration[$key] ?? '(MISSING)', "$testDescription: Expect declr $i to have $key = $value");
+          }
         }
       }
     } while ($expectations);
