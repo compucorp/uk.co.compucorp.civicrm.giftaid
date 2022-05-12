@@ -301,7 +301,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
           // This start date needs to be relevant to actually NOW, since that's the way
           // the code is written (@todo open issue on this).
           ['start_date' => date('Y-m-d', strtotime('today - 1 year')), 'eligible_for_gift_aid' => $yes],
-          ['start_date' => '2020-05-01 00:00:00', 'eligible_for_gift_aid' => $yesPast4],
+          ['start_date' => date('Y-m-d'), 'eligible_for_gift_aid' => $yesPast4],
         ],
         [
           ['start_date' => date('Y-m-d H:i:s'), 'eligible_for_gift_aid' => $yesPast4, 'end_date' => '', 'reason_ended' => ''],
