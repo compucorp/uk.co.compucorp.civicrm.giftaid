@@ -90,7 +90,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
       // Check for declarations.
       $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
-      $this->assertInternalType('array', $declarations, $assertionContext);
+      $this->assertIsArray($declarations, $assertionContext);
 
       // Special case: a No declaration does not get created.
       if ($type === CRM_Civigiftaid_Declaration::DECLARATION_IS_NO) {
@@ -159,7 +159,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
     // Check for declarations.
     $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
-    $this->assertInternalType('array', $declarations, $testDescription);
+    $this->assertIsArray($declarations, $testDescription);
     $this->assertCount(count($expectations), $declarations, $testDescription);
 
     if (!$expectations) {
