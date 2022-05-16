@@ -90,7 +90,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
       // Check for declarations.
       $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
-      $this->assertInternalType('array', $declarations, $assertionContext);
+      $this->assertIsArray($declarations, $assertionContext);
 
       // Special case: a No declaration does not get created.
       if ($type === CRM_Civigiftaid_Declaration::DECLARATION_IS_NO) {
@@ -146,7 +146,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       // Clear static caches.
       unset(Civi::$statics[E::LONG_NAME]); //['updatedDeclarationAmount']);
       unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
-      // Fix annoying date format thing.
+      // Convert date formats from ISO (Y-m-d H:i:s) to MySQL style (YmdHis)
       foreach (['start_date', 'end_date', 'given_date'] as $_) {
         if (!empty($declaration[$_])) {
           $declaration[$_] = preg_replace('/[^0-9]/', '', $declaration[$_]);
@@ -159,7 +159,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
     // Check for declarations.
     $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
-    $this->assertInternalType('array', $declarations, $testDescription);
+    $this->assertIsArray($declarations, $testDescription);
     $this->assertCount(count($expectations), $declarations, $testDescription);
 
     if (!$expectations) {
@@ -186,7 +186,13 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
         }
         else {
           // Simple comparison.
-          $this->assertEquals($value, $declaration[$key] ?? '(MISSING)', "$testDescription: Expect declr $i to have $key = $value");
+          if ($value === '') {
+            // Allow '' === undefined.
+            $this->assertEquals($value, $declaration[$key] ?? '', "$testDescription: Expect declr $i to have $key = ''");
+          }
+          else {
+            $this->assertEquals($value, $declaration[$key] ?? '(MISSING)', "$testDescription: Expect declr $i to have $key = $value");
+          }
         }
       }
     } while ($expectations);
@@ -295,7 +301,7 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
           // This start date needs to be relevant to actually NOW, since that's the way
           // the code is written (@todo open issue on this).
           ['start_date' => date('Y-m-d', strtotime('today - 1 year')), 'eligible_for_gift_aid' => $yes],
-          ['start_date' => '2020-05-01 00:00:00', 'eligible_for_gift_aid' => $yesPast4],
+          ['start_date' => date('Y-m-d'), 'eligible_for_gift_aid' => $yesPast4],
         ],
         [
           ['start_date' => date('Y-m-d H:i:s'), 'eligible_for_gift_aid' => $yesPast4, 'end_date' => '', 'reason_ended' => ''],

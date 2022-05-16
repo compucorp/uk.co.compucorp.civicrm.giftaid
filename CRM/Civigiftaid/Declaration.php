@@ -160,6 +160,8 @@ class CRM_Civigiftaid_Declaration {
   private static function getPartialDeclaration(int $contactID): array {
     $giftAidDeclaration = CustomValue::get('gift_aid_declaration', FALSE)
       ->addWhere('entity_id', '=', $contactID)
+      ->addWhere('post_code', 'IS NULL')
+      ->addWhere('start_date', 'IS NULL')
       ->addOrderBy('id', 'DESC')
       ->setLimit(1)
       ->execute()
