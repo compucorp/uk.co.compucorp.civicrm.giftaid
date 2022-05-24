@@ -620,14 +620,14 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $contributionIDs
    *  Array of contribution Ids.
    * @return array
-   *  Array of contributions Ids that are alredy in batch.
+   *  Array of contributions Ids that are already in batch.
    */
   private static function getContributionsInBatch(array $contributionIDs) {
     $contributions = civicrm_api3('EntityBatch', 'get', [
         'return' => ['entity_id'],
         'entity_table' => 'civicrm_contribution',
         'batch_id.type_id' => "giftaid_batch",
-        'entity_id' => [ 'IN' => [$contributionIDs]],
+        'entity_id' => [ 'IN' => (array) $contributionIDs],
     ]);
 
     $contributionsInBatch = [];
