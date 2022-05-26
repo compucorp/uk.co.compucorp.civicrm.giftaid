@@ -215,8 +215,9 @@ class CRM_Civigiftaid_Utils_GiftAid {
         if ( $params['eligible_for_gift_aid'] == 1 ) {
 
             if ( !$currentDeclaration ) {
-              // To avoid having duplicates/invalid declaration, we delete
-              // declarations with no start_date before creating a new one.
+              // There are cases when CiviCRM creates a new decalaration with null start_date
+              // before the appropriate hook that uses this function is called, if that happens
+              // we delete such decalaration before creating a new one.
               CRM_Civigiftaid_Utils_GiftAid::_deleteDecarationWithNullStartDate($params['entity_id']);
               CRM_Civigiftaid_Utils_GiftAid::_insertDeclaration( $params, $endTimestamp );
             } else if ( $currentDeclaration['eligible_for_gift_aid'] == 1 && $endTimestamp ) {
