@@ -215,9 +215,11 @@ class CRM_Civigiftaid_Utils_GiftAid {
         if ( $params['eligible_for_gift_aid'] == 1 ) {
 
             if ( !$currentDeclaration ) {
-                // There is no current declaration so create new.
-               CRM_Civigiftaid_Utils_GiftAid::_insertDeclaration( $params, $endTimestamp );
-
+              // There are cases when CiviCRM creates a new decalaration with null start_date
+              // before the appropriate hook that uses this function is called, if that happens
+              // we delete such decalaration before creating a new one.
+              CRM_Civigiftaid_Utils_GiftAid::_deleteDecarationWithNullStartDate($params['entity_id']);
+              CRM_Civigiftaid_Utils_GiftAid::_insertDeclaration( $params, $endTimestamp );
             } else if ( $currentDeclaration['eligible_for_gift_aid'] == 1 && $endTimestamp ) {
                 //   - if current positive, extend its end_date to new_end_date.
                 $updateParams = array(
@@ -343,8 +345,21 @@ class CRM_Civigiftaid_Utils_GiftAid {
         $dao = CRM_Core_DAO::executeQuery( $sql, $queryParams );
     }
 
+    /**
+     * Deletes a contact declaration with null start date.
+     * 
+     * @param int $id
+     *  ID of the Contact for whom we're deleting decalaration.
+     */
+    static function _deleteDecarationWithNullStartDate($contactID) {
+      CRM_Utils_SQL_Delete::from('civicrm_value_gift_aid_declaration')
+        ->where('entity_id = #contact', ['contact' => $contactID])
+        ->where('start_date IS NULL')
+        ->execute();
+    }
+
     static function getContactsWithDeclarations() {
-      $contactsWithPastDeclarations = array();
+      $contactsWithDeclarations = [];
       $sql = "
         SELECT id, eligible_for_gift_aid, entity_id
         FROM   civicrm_value_gift_aid_declaration
