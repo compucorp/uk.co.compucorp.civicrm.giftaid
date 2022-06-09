@@ -1050,9 +1050,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
         'is_locked' => 1,
       ],
     ];
-    $optionGroups['batch_type'] = civicrm_api3('OptionGroup', 'getsingle', [
-      'name' => 'batch_type',
-    ]);
+    $optionGroups['batch_type'] = [];
     return $optionGroups;
   }
 
