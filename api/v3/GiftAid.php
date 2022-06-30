@@ -55,6 +55,10 @@ function _civicrm_api3_gift_aid_updateeligiblecontributions_spec(&$params) {
   $params['recalculate_amount']['title'] = 'Recalculate amounts';
   $params['recalculate_amount']['description'] = 'Recalculate Gift Aid amounts even if they already have the eligible flag set. This will not touch contributions already in a batch.';
   $params['recalculate_amount']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['no_log']['title'] = 'Disable logging for these changes?';
+  $params['no_log']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['no_log']['description'] = 'Choose whether to disable logging when doing these updates';
+  $params['no_log']['api.default'] = FALSE;
 }
 
 /**
@@ -93,12 +97,15 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   }
 
   // Disable logging
-  $loggingSchema = new \CRM_Logging_Schema();
-  $loggingEnabled = $loggingSchema->isEnabled();
-  if ($loggingEnabled) {
-    $loggingSchema->disableLogging();
-    Civi::settings()->set('logging', '0');
+  if ($params['no_log']) {
+    $loggingSchema = new \CRM_Logging_Schema();
+    $loggingEnabled = $loggingSchema->isEnabled();
+    if ($loggingEnabled) {
+      $loggingSchema->disableLogging();
+      Civi::settings()->set('logging', '0');
+    }
   }
+
 
   try {
     foreach ($contributions as $contributionID => $contributionDetail) {
@@ -113,7 +120,7 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   }
   finally {
     // Re-enable logging
-    if ($loggingEnabled) {
+    if ($params['no_log'] && $loggingEnabled) {
       $loggingSchema->enableLogging();
       Civi::settings()->set('logging', '1');
     }
@@ -133,6 +140,10 @@ function _civicrm_api3_gift_aid_recalculatecontributionamounts_spec(&$params) {
   $params['batch_name']['title'] = 'The batch name (optional)';
   $params['batch_name']['description'] = 'If specified, amounts will be recalculated for contributions with this batch name only. Otherwise only contributions with no batch name will be recalculated.';
   $params['batch_name']['type'] = CRM_Utils_Type::T_STRING;
+  $params['no_log']['title'] = 'Disable logging for these changes?';
+  $params['no_log']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['no_log']['description'] = 'Choose whether to disable logging when doing these updates';
+  $params['no_log']['api.default'] = FALSE;
 }
 
 function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
@@ -159,11 +170,13 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   }
 
   // Disable logging
-  $loggingSchema = new \CRM_Logging_Schema();
-  $loggingEnabled = $loggingSchema->isEnabled();
-  if ($loggingEnabled) {
-    $loggingSchema->disableLogging();
-    Civi::settings()->set('logging', '0');
+  if ($params['no_log']) {
+    $loggingSchema = new \CRM_Logging_Schema();
+    $loggingEnabled = $loggingSchema->isEnabled();
+    if ($loggingEnabled) {
+      $loggingSchema->disableLogging();
+      Civi::settings()->set('logging', '0');
+    }
   }
 
   try {
@@ -187,7 +200,7 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   }
   finally {
     // Re-enable logging
-    if ($loggingEnabled) {
+    if ($params['no_log'] && $loggingEnabled) {
       $loggingSchema->enableLogging();
       Civi::settings()->set('logging', '1');
     }
@@ -204,10 +217,30 @@ function _civicrm_api3_gift_aid_updatedeclarations_spec(&$params) {
   $params['given_date']['description'] = 'Given date - if not set defaults to existing date or start_date or contact created_date';
   $params['source']['title'] = 'Source text';
   $params['source']['description'] = 'Source text if existing declaration source text is empty.';
-  $params['has_start_date']['title'] = 'Existing declaration has start date?';
+  $params['has_start_date']['title'] = 'Declaration has start date?';
   $params['has_start_date']['type'] = CRM_Utils_Type::T_BOOLEAN;
-  $params['has_start_date']['description'] = 'Choose whether to update declarations which have/have not a start_date set';
+  $params['has_start_date']['description'] = 'Only update declarations that have a start date set.';
   $params['has_start_date']['api.default'] = FALSE;
+  $params['no_start_date']['title'] = 'Declaration has no start date?';
+  $params['no_start_date']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['no_start_date']['description'] = 'Only update declarations that do not have a start date set.';
+  $params['no_start_date']['api.default'] = FALSE;
+  $params['no_log']['title'] = 'Disable logging for these changes?';
+  $params['no_log']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['no_log']['description'] = 'Choose whether to disable logging when doing these updates';
+  $params['no_log']['api.default'] = FALSE;
+  $params['replace_address']['title'] = 'Replace the declaration address with the current address?';
+  $params['replace_address']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['replace_address']['description'] = 'By default, only missing addresses are updated. Use this to update existing addresses as well';
+  $params['replace_address']['api.default'] = FALSE;
+  $params['reformat_address']['title'] = 'Reformat address on declaration?';
+  $params['reformat_address']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['reformat_address']['description'] = 'Choose whether to reformat the address to current expected format';
+  $params['reformat_address']['api.default'] = FALSE;
+  $params['all']['title'] = "Apply updates to all of a contact's declarations?";
+  $params['all']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $params['all']['description'] = "By default, changes are only applied to a contact's first declaration.  If true, update all declarations";
+  $params['all']['api.default'] = FALSE;
 }
 
 function civicrm_api3_gift_aid_updatedeclarations($params) {
@@ -227,84 +260,120 @@ function civicrm_api3_gift_aid_updatedeclarations($params) {
     $contactIDs[] = $params['contact_id'];
   }
 
-  $startDate = '';
-  if (isset($params['start_date'])) {
-    $startDate = $params['start_date'];
-  }
-  if (isset($params['given_date'])) {
-    $givenDate = $params['given_date'];
-  }
-
   // Disable logging
-  $loggingSchema = new \CRM_Logging_Schema();
-  $loggingEnabled = $loggingSchema->isEnabled();
-  if ($loggingEnabled) {
-    $loggingSchema->disableLogging();
-    Civi::settings()->set('logging', '0');
+  if ($params['no_log']) {
+    $loggingSchema = new \CRM_Logging_Schema();
+    $loggingEnabled = $loggingSchema->isEnabled();
+    if ($loggingEnabled) {
+      $loggingSchema->disableLogging();
+      Civi::settings()->set('logging', '0');
+    }
   }
 
   try {
     foreach ($contactIDs as $contactID) {
-      list($addressDetails, $postCode) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($contactID);
-
-      $currentDeclaration = CRM_Civigiftaid_Declaration::getDeclaration($contactID, '');
-      if (empty($currentDeclaration)) {
-        $updated['contactIDNoDeclaration'][] = $contactID;
-        continue;
-      }
-
-      // Check if we should update declaration based api param if it has a start date
-      if (empty($currentDeclaration['start_date'])) {
-        if ($params['has_start_date']) {
-          // Current declaration has no start date but we require one
-          $updated['contactIDSkippedNoStartDate'][] = $contactID;
+      if ($params['all']) {
+        $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactID);
+        if (empty($declarations)) {
+          $updated['contactIDNoDeclaration'][] = $contactID;
           continue;
         }
       }
-      elseif (!empty($currentDeclaration['start_date'])) {
-        if (!$params['has_start_date']) {
-          // Current declaration has a start date and we are only updating ones that don't
-          $updated['contactIDSkippedHasStartDate'][] = $contactID;
+      else {
+        $declaration = CRM_Civigiftaid_Declaration::getDeclaration($contactID, '');
+        if (empty($declaration)) {
+          $updated['contactIDNoDeclaration'][] = $contactID;
           continue;
         }
+        $declarations = [$declaration];
       }
 
-      if (!empty($currentDeclaration['given_date'])) {
-        $givenDate = $currentDeclaration['given_date'];
-      }
-      if (!empty($currentDeclaration['start_date'])) {
-        $startDate = $currentDeclaration['start_date'];
-      }
-      elseif (empty($currentDeclaration['start_date']) && empty($startDate)) {
-        // Set start date to contact create date
-        $startDate = civicrm_api3('Contact', 'getvalue', [
-          'id' => $contactID,
-          'return' => 'created_date'
-        ]);
-      }
-      if (empty($givenDate)) {
-        $givenDate = $startDate;
-      }
+      foreach ($declarations as $currentDeclaration) {
+        // Check if we should update declaration based on start date api params
+        if (empty($currentDeclaration['start_date'])) {
+          if ($params['has_start_date']) {
+            // Current declaration has no start date but we require one
+            $updated['contactIDSkippedNoStartDate'][] = $contactID;
+            continue;
+          }
+        }
+        else {  // start_date not empty
+          if ($params['no_start_date']) {
+            // Current declaration has a start date and we are only updating ones that don't
+            $updated['contactIDSkippedHasStartDate'][] = $contactID;
+            continue;
+          }
+        }
 
-      $declarationParams = [
-        'id' => $currentDeclaration['id'],
-        'entity_id' => $contactID,
-        'start_date' => CRM_Utils_Date::isoToMysql($startDate),
-        'given_date' => CRM_Utils_Date::isoToMysql($givenDate),
-        'address' => $addressDetails,
-        'post_code' => $postCode,
-      ];
-      if (empty($currentDeclaration['source']) && isset($params['source'])) {
-        $declarationParams['source'] = $params['source'];
-      }
-      CRM_Civigiftaid_Declaration::insertDeclaration($declarationParams);
+        // Initialise from api params
+        $startDate = $givenDate = '';
+        if (isset($params['start_date'])) {
+          $startDate = $params['start_date'];
+        }
+        if (isset($params['given_date'])) {
+          $givenDate = $params['given_date'];
+        }
 
-      $updated['contactIDs'][] = $contactID;
+        // Keep the given_date if already set
+        if (!empty($currentDeclaration['given_date'])) {
+          $givenDate = $currentDeclaration['given_date'];
+        }
+
+        // Keep the start_date if already set
+        if (!empty($currentDeclaration['start_date'])) {
+          $startDate = $currentDeclaration['start_date'];
+        }
+        elseif (empty($currentDeclaration['start_date']) && empty($startDate)) {
+          // Set start date to contact create date
+          $startDate = civicrm_api3('Contact', 'getvalue', [
+            'id' => $contactID,
+            'return' => 'created_date'
+          ]);
+        }
+        if (empty($givenDate)) {
+          $givenDate = $startDate;
+        }
+
+        // Handle address
+        $address = $currentDeclaration['address'] ?? '';
+        $postCode = $currentDeclaration['post_code'] ?? '';
+        // Check if we should reformat the address
+        if ($params['reformat_address']) {
+          list($address, $postCode) = CRM_Civigiftaid_Declaration::reformatAddress($address, $postCode);
+        }
+
+        // Set to current address if address is missing or we are replacing all addresses
+        if (empty($address) || $params['replace_address']) {
+          list($address, $postCode) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($contactID);
+        }
+
+        $declarationParams = [
+          'id' => $currentDeclaration['id'],
+          'entity_id' => $contactID,
+          'start_date' => $startDate,
+          'given_date' => $givenDate,
+          'address' => $address,
+          'post_code' => $postCode,
+        ];
+        if (empty($currentDeclaration['source']) && isset($params['source'])) {
+          $declarationParams['source'] = $params['source'];
+        }
+
+        if (!empty(array_diff_assoc($declarationParams, $currentDeclaration))) {
+          $declarationParams['start_date'] = CRM_Utils_Date::isoToMysql($declarationParams['start_date']);
+          $declarationParams['given_date'] = CRM_Utils_Date::isoToMysql($declarationParams['given_date']);
+          CRM_Civigiftaid_Declaration::insertDeclaration($declarationParams);
+          $updated['contactIDs'][] = $contactID;
+        }
+        else {
+          $updated['contactIDNoChange'][] = $contactID;
+        }
+      }
     }
   }
   finally {
     // Re-enable logging
-    if ($loggingEnabled) {
+    if ($params['no_log'] && $loggingEnabled) {
       $loggingSchema->enableLogging();
       Civi::settings()->set('logging', '1');
     }
