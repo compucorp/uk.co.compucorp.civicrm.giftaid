@@ -376,4 +376,130 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       ->first();
   }
 
+  public function addressReformatTestProvider() {
+    return [
+      [ ['address' => 'something overseas', 'postcode' => 'X'], ['address' => 'something overseas', 'postcode' => 'X'] ],
+      [ ['address' => 'Rose Cottage, Mytown, MT1 1MT', 'postcode' => ''], ['address' => 'Rose Cottage, Mytown', 'postcode' => 'MT1 1MT'] ],
+      [ ['address' => 'Rose Cottage, Mytown MT1 1MT', 'postcode' => ''], ['address' => 'Rose Cottage, Mytown', 'postcode' => 'MT1 1MT'] ],
+      [ ['address' => 'Rose Cottage, Mytown, MT1 1MT', 'postcode' => 'MT2 2MT'], ['address' => 'Rose Cottage, Mytown, MT1 1MT', 'postcode' => 'MT2 2MT'] ],
+      [ ['address' => 'Rose Cottage, Mytown, MT1 1MT', 'postcode' => 'mt22mt'], ['address' => 'Rose Cottage, Mytown, MT1 1MT', 'postcode' => 'MT2 2MT'] ],
+      [ ['address' => "Rose Cottage\nMytown", 'postcode' => 'MT1 1MT'], ['address' => 'Rose Cottage, Mytown', 'postcode' => 'MT1 1MT'] ],
+      [ ['address' => "Rose Cottage\nMytown\nMT1 1MT", 'postcode' => ''], ['address' => 'Rose Cottage, Mytown', 'postcode' => 'MT1 1MT'] ],
+      [ ['address' => "1 a High Street\nMy Neighbourhood\nBig Place\nbp1 1bp", 'postcode' => ''], ['address' => '1 a High Street, My Neighbourhood, Big Place', 'postcode' => 'BP1 1BP'] ],
+      [ ['address' => "10 The Highway\nSleepy Hamlet\nab123cd", 'postcode' => ''], ['address' => '10 The Highway, Sleepy Hamlet', 'postcode' => 'AB12 3CD'] ],
+      [ ['address' => "10 The Highway\rSleepy Hamlet\rab123cd", 'postcode' => ''], ['address' => '10 The Highway, Sleepy Hamlet', 'postcode' => 'AB12 3CD'] ],
+      [ ['address' => "10 The Highway\r\nSleepy Hamlet\r\nab123cd", 'postcode' => ''], ['address' => '10 The Highway, Sleepy Hamlet', 'postcode' => 'AB12 3CD'] ],
+      [ ['address' => "10 The Highway,\r\nSleepy Hamlet,\r\nab123cd", 'postcode' => ''], ['address' => '10 The Highway, Sleepy Hamlet', 'postcode' => 'AB12 3CD'] ],
+      [ ['address' => "\r\n10 The Highway, \r\nSleepy Hamlet, \r\nab123cd\r\n\r\n", 'postcode' => ''], ['address' => '10 The Highway, Sleepy Hamlet', 'postcode' => 'AB12 3CD'] ],
+    ];
+  }
+
+  /**
+   * @dataProvider addressReformatTestProvider
+   */
+  public function testReformatAddress($unformatted, $expected) {
+    $formatted = array_combine(['address', 'postcode'], CRM_Civigiftaid_Declaration::reformatAddress($unformatted['address'], $unformatted['postcode']));
+    $this->assertEquals($expected, $formatted);
+
+    // reformatting a second time should not change anything
+    $again = array_combine(['address', 'postcode'], CRM_Civigiftaid_Declaration::reformatAddress($formatted['address'], $formatted['postcode']));
+    $this->assertEquals($expected, $again);
+  }
+
+  public function apiUpdateDeclarationsProvider() {
+    return [
+      [
+        ['source' => 'My New Source'],
+        ['address' => 'Anywhere'],  // Empty array throws errors ...
+        ['source' => 'My New Source'],
+      ],
+      [
+        ['source' => 'My New Source'],
+        ['source' => 'The Old Source', 'address' => 'Anywhere'],
+        ['source' => 'The Old Source'],
+      ],
+      [
+        ['has_start_date' => TRUE, 'source' => 'My New Source'],
+        ['address' => 'Anywhere'],
+        ['source' => ''],
+      ],
+      [
+        ['no_start_date' => TRUE, 'source' => 'My New Source'],
+        ['address' => 'Anywhere'],
+        ['source' => 'My New Source'],
+      ],
+      [
+        ['has_start_date' => TRUE, 'no_start_date' => TRUE, 'source' => 'My New Source'],
+        ['source' => 'The Old Source', 'address' => 'Anywhere'],
+        ['source' => 'The Old Source'],
+      ],
+      [
+        ['start_date' => '2022-01-01 00:00:00', 'given_date' => '2022-01-05 13:05:00', 'reformat_address' => TRUE],
+        ['given_date' => '2022-01-03 23:35:00', 'address' => "1 High Street\nMy Area\nBig Place\nbp11aj"],
+        ['address' => "1 High Street, My Area, Big Place", 'post_code' => 'BP1 1AJ', 'start_date' =>'2022-01-01 00:00:00',  'given_date' => '2022-01-03 23:35:00']
+      ],
+    ];
+  }
+
+  /**
+   * @dataProvider apiUpdateDeclarationsProvider
+   */
+  public function testApiUpdateDeclarations($apiParams, $declaration, $expected) {
+    // create declarations
+    $contactId = $this->contacts[0]['id'];
+    $entityIdParam = ['entity_id' => $contactId];
+    // Convert date formats from ISO (Y-m-d H:i:s) to MySQL style (YmdHis)
+    foreach (['start_date', 'end_date', 'given_date'] as $_) {
+      if (!empty($declaration[$_])) {
+        $declaration[$_] = CRM_Utils_Date::isoToMysql($declaration[$_]);
+      }
+    }
+    CRM_Civigiftaid_Declaration::insertDeclaration($declaration + $entityIdParam);
+    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
+
+    civicrm_api3('GiftAid', 'updateDeclarations', $apiParams + ['contact_id' => $contactId] );
+    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
+
+    $this->assertEquals(1, count($declarations));
+    foreach ($expected as $field => $value) {
+      $this->assertEquals($value, $declarations[0][$field]);
+    }
+
+    // Delete the declaration.
+    CustomValue::delete('gift_aid_declaration')
+      ->setCheckPermissions(FALSE)
+      ->addWhere('id', '=', $declarations[0]['id'])
+      ->execute();
+  }
+
+  public function testApiUpdateDeclarationsAll() {
+    $contactId = $this->contacts[0]['id'];
+    $entityIdParam = ['entity_id' => $contactId];
+    CRM_Civigiftaid_Declaration::insertDeclaration(['address' => "Place 1\nSomewhere"] + $entityIdParam);
+    CRM_Civigiftaid_Declaration::insertDeclaration(['address' => "Place 2\nSomewhere"] + $entityIdParam);
+    // Check we are starting as we expect
+    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
+    $this->assertEquals(2, count($declarations));
+
+    // Without 'all' - Check just the first address is changed.
+    civicrm_api3('GiftAid', 'updateDeclarations', ['reformat_address' => TRUE, 'contact_id' => $contactId]);
+    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
+    $this->assertEquals("Place 1, Somewhere", $declarations[0]['address']);
+    $this->assertEquals("Place 2\nSomewhere", $declarations[1]['address']);
+
+    // With 'all' - Check both addresses are changed.
+    civicrm_api3('GiftAid', 'updateDeclarations', ['reformat_address' => TRUE, 'contact_id' => $contactId, 'all' => TRUE]);
+    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
+    // Check just the first address is changed.
+    $this->assertEquals("Place 1, Somewhere", $declarations[0]['address']);
+    $this->assertEquals("Place 2, Somewhere", $declarations[1]['address']);
+
+    // Delete the declarations.
+    CustomValue::delete('gift_aid_declaration')
+      ->setCheckPermissions(FALSE)
+      ->addWhere('id', 'IN', [$declarations[0]['id'], $declarations[1]['id']])
+      ->execute();
+  }
+
+
 }

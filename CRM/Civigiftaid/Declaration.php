@@ -495,11 +495,12 @@ class CRM_Civigiftaid_Declaration {
     // Note that a record with an end_date will be chosen over one with a NULL
     // end_date, since ORDER BY end_date DESC will put NULL values last.
     $currentDeclaration = [];
+    $dateClause = '';
     if (!empty($date)) {
       $dateClause = "AND start_date <= %2 AND (end_date > %2 OR end_date IS NULL)";
     }
     $sql = "
-        SELECT id, entity_id, eligible_for_gift_aid, start_date, end_date, reason_ended, source, notes, address, post_code
+        SELECT id, entity_id, eligible_for_gift_aid, start_date, given_date, end_date, reason_ended, source, notes, address, post_code
         FROM   civicrm_value_gift_aid_declaration
         WHERE  entity_id = %1 {$dateClause}
         ORDER BY end_date DESC";
@@ -515,6 +516,7 @@ class CRM_Civigiftaid_Declaration {
       $currentDeclaration['entity_id'] = (int) $dao->entity_id;
       $currentDeclaration['eligible_for_gift_aid'] = (int) $dao->eligible_for_gift_aid;
       $currentDeclaration['start_date'] = CRM_Utils_Date::isoToMysql($dao->start_date);
+      $currentDeclaration['given_date'] = CRM_Utils_Date::isoToMysql($dao->given_date);
       $currentDeclaration['end_date'] = CRM_Utils_Date::isoToMysql($dao->end_date);
       $currentDeclaration['reason_ended'] = (string) $dao->reason_ended;
       $currentDeclaration['source'] = (string) $dao->source;
@@ -670,6 +672,41 @@ class CRM_Civigiftaid_Declaration {
     }
 
     return $aAddress;
+  }
+
+  /**
+   * Reformat a declaration address to current expectations
+   *
+   * Old declarations may have addresses stored in other formats.
+   * - comma separated with postcode in $addressDetails, not separate
+   * - \n separated fields in $addressDetails
+   *
+   * @param string $addressDetails
+   * @param string $postCode
+   *
+   * @return array
+   */
+  public static function reformatAddress(string $addressDetails, string $postCode) : array {
+    // Convert various separators to ", "
+    $addressDetails = implode(", ", array_map('trim', preg_split("/(, ?|\r|\n)+/", $addressDetails, 0, PREG_SPLIT_NO_EMPTY)));
+
+    // Existing postcode?
+    if ($postCode) {
+      // regex adapted from https://en.wikipedia.org/wiki/Postcodes_in_the_United_Kingdom#Validation
+      // Try to make sure it has the space in the right place
+      if (preg_match('/([A-Z]{1,2}\d[A-Z\d]?) ?(\d[A-Z]{2})$/i', $postCode, $p)) {
+        $postCode = $p[1] . " " . $p[2];
+      }
+    }
+    else { // Try to find it in the address
+      // regex adapted from https://en.wikipedia.org/wiki/Postcodes_in_the_United_Kingdom#Validation
+      if (preg_match('/^(.*) ([A-Z]{1,2}\d[A-Z\d]?) ?(\d[A-Z]{2})$/i', $addressDetails, $p)) {
+        $addressDetails = rtrim($p[1], ",");  // Remove trailing comma if present
+        $postCode = $p[2] . " " . $p[3];
+      }
+    }
+    $postCode = strtoupper($postCode);
+    return [$addressDetails, $postCode];
   }
 
 }
