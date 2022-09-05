@@ -78,7 +78,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
           'contribution_id' => [
             'name' => 'id',
             'title' => E::ts('Contribution ID'),
-            'required' => FALSE,
+            'required' => TRUE,
           ],
           'contact_id' => [
             'name' => 'contact_id',
