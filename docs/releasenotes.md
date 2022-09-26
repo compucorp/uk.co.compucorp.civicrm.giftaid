@@ -9,6 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.5.2 (2022-09-26)
+
+* Fix [#34](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/34) Report results in fatal error if contribution column is not not selected.
+
 ## Release 3.5.1 (2022-05-16)
 
 * Fix [#28](https://lab.civicrm.org/extensions/ukgiftaid/-/issues/28) Fix broken logic in 3.5 with declarations.
