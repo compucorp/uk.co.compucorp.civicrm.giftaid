@@ -25,15 +25,6 @@ function civigiftaid_civicrm_config(&$config) {
 }
 
 /**
- * Implementation of hook_civicrm_xmlMenu
- *
- * @param $files array(string)
- */
-function civigiftaid_civicrm_xmlMenu(&$files) {
-  _civigiftaid_civix_civicrm_xmlMenu($files);
-}
-
-/**
  * Implementation of hook_civicrm_install
  */
 function civigiftaid_civicrm_install() {
@@ -79,25 +70,6 @@ function civigiftaid_civicrm_disable() {
  */
 function civigiftaid_civicrm_upgrade($op, CRM_Queue_Queue $queue = NULL) {
   return _civigiftaid_civix_civicrm_upgrade($op, $queue);
-}
-
-/**
- * Implementation of hook_civicrm_managed
- *
- * Generate a list of entities to create/deactivate/delete when this module
- * is installed, disabled, uninstalled.
- */
-function civigiftaid_civicrm_managed(&$entities) {
-  _civigiftaid_civix_civicrm_managed($entities);
-}
-
-/**
- * Implements hook_civicrm_alterSettingsFolders().
- *
- * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_alterSettingsFolders
- */
-function civigiftaid_civicrm_alterSettingsFolders(&$metaDataFolders = NULL) {
-  _civigiftaid_civix_civicrm_alterSettingsFolders($metaDataFolders);
 }
 
 /**
@@ -456,4 +428,13 @@ function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value
       // This will fail for older batches which stored the label instead of the name for the batch_name field.
     }
   }
+}
+
+/**
+ * Implements hook_civicrm_entityTypes().
+ *
+ * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_entityTypes
+ */
+function civigiftaid_civicrm_entityTypes(&$entityTypes) {
+  _civigiftaid_civix_civicrm_entityTypes($entityTypes);
 }

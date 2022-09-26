@@ -1,5 +1,5 @@
-<?xml version="1.0" encoding="iso-8859-1" ?>
- <extension key="uk.co.compucorp.civicrm.giftaid" type="module">
+<?xml version="1.0" encoding="iso-8859-1"?>
+<extension key="uk.co.compucorp.civicrm.giftaid" type="module">
   <file>civigiftaid</file>
   <name>UK Gift Aid</name>
   <description>
@@ -26,5 +26,11 @@
   </compatibility>
   <civix>
     <namespace>CRM/Civigiftaid</namespace>
+    <format>22.05.2</format>
   </civix>
+  <mixins>
+    <mixin>menu-xml@1.0.0</mixin>
+    <mixin>mgd-php@1.0.0</mixin>
+    <mixin>setting-php@1.0.0</mixin>
+  </mixins>
 </extension>
