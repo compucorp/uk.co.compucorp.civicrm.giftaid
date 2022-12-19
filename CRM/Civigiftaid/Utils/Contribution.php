@@ -458,6 +458,10 @@ class CRM_Civigiftaid_Utils_Contribution {
     self::addContributionDetails($contributionIdStr, $result);
 
     if (count($result)) {
+      array_walk($result, function(&$contribution) {
+        $contribution['line_items'] = [];
+      });
+
       self::addLineItemDetails($contributionIdStr, $result);
     }
 
