@@ -28,7 +28,7 @@ These instructions assume that you are only upgrading the Gift Aid module from v
 
 4. [3.0] **[Important]** A new type of Gift Aid declaration is applied to covers both present& future donation and the donations a donor made in the past four years from the declaration date as long as the Gift Aid claim amount does not exceed tax amount. The old 'Yes' declaration is reserved to cover any old declarations donors made. Settings for the declatation options can be modified in the 'UK Taxpayer Options' list here: http://www.example.com/civicrm/admin/options?reset=1
 
-5. [3.0] **[Important]** From Gift Aid 3.0 onwards, a new mechanism is introduced to marking donations from the past 4 years eligible to Gift Aid based on the new declaration type. **Present and future donations will not be affected by this new mechanism.** A scheduled job will be used to handle the 100 past donation records per run. To enable this scheduled job, please go to http://www.example.com/civicrm/admin/job and enable the job 'Process Gift Aid eligible donations'.
+5. [3.0] **[Important]** From Gift Aid 3.0 onwards, a new mechanism is introduced to marking donations from the past 4 years eligible to Gift Aid based on the new declaration type. **Present and future donations will not be affected by this new mechanism.** A scheduled job will be used to handle the 100 past donation records per run. To enable this scheduled job, please go to http://www.example.com/civicrm/admin/job and enable the job 'Make Past Year Submissions'.
 
 
 ### Configure the Gift Aid Profile and disclaimer
