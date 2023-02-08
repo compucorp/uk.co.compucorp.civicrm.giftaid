@@ -91,7 +91,7 @@ function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   if (!empty($params['options']['offset'])) {
     $contributions->setLimit($params['options']['offset']);
   }
-  $contributions->execute()->indexBy('id');
+  $contributions = $contributions->execute()->indexBy('id');
   if (empty($contributions)) {
     return civicrm_api3_create_error('No contributions found or all have Eligible flag set!');
   }
