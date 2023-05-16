@@ -39,7 +39,7 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
     $this->batchTitle = 'GiftAid ' . CRM_Batch_BAO_Batch::generateBatchName();
     $this->batchName = CRM_Utils_String::titleToVar($this->batchTitle, 63);
 
-    if ($this->isSubmitted()) {
+    if ($this->controller instanceof CRM_Contribute_Controller_Search && $this->isSubmitted()) {
       return;
     }
 
@@ -69,7 +69,7 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
   }
 
   public function buildQuickForm() {
-    if ($this->isSubmitted()) {
+    if ($this->controller instanceof CRM_Contribute_Controller_Search && $this->isSubmitted()) {
       return;
     }
 

@@ -3,9 +3,6 @@
 require_once 'civigiftaid.civix.php';
 use CRM_Civigiftaid_ExtensionUtil as E;
 
-define('CIVICRM_GIFTAID_ADD_TASKID', 1435);
-define('CIVICRM_GIFTAID_REMOVE_TASKID', 1436);
-
 /**
  * Implementation of hook_civicrm_config
  */
@@ -137,16 +134,7 @@ function civigiftaid_civicrm_check(&$messages) {
  */
 function civigiftaid_civicrm_searchTasks($objectType, &$tasks) {
   if ($objectType == 'contribution') {
-    $tasks[CIVICRM_GIFTAID_ADD_TASKID] = [
-      'title'  => E::ts('Add to Gift Aid batch'),
-      'class'  => 'CRM_Civigiftaid_Form_Task_AddToBatch',
-      'result' => FALSE
-    ];
-    $tasks[CIVICRM_GIFTAID_REMOVE_TASKID] = [
-      'title'  => E::ts('Remove from Gift Aid batch'),
-      'class'  => 'CRM_Civigiftaid_Form_Task_RemoveFromBatch',
-      'result' => FALSE
-    ];
+    $tasks += CRM_Civigiftaid_Controller_Task::tasks();
   }
 }
 
