@@ -59,7 +59,7 @@ return [
       'class' => 'crm-select2',
       'multiple' => TRUE
     ],
-    'pseudoconstant' => ['callback' => 'CRM_Contribute_PseudoConstant::financialType'],
+    'pseudoconstant' => ['callback' => 'CRM_Civigiftaid_Settings::allFinancialTypes'],
     'settings_pages' => [
       'ukgiftaid' => [
         'weight' => 10,
