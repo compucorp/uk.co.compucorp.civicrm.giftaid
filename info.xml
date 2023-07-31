@@ -26,7 +26,7 @@
   </compatibility>
   <civix>
     <namespace>CRM/Civigiftaid</namespace>
-    <format>22.05.2</format>
+    <format>22.10.0</format>
   </civix>
   <classloader>
     <psr0 prefix="CRM_" path="."/>
@@ -37,4 +37,7 @@
     <mixin>mgd-php@1.0.0</mixin>
     <mixin>setting-php@1.0.0</mixin>
   </mixins>
+  <classloader>
+    <psr0 prefix="CRM_" path="."/>
+  </classloader>
 </extension>

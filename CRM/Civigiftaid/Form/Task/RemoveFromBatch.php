@@ -20,7 +20,7 @@ class CRM_Civigiftaid_Form_Task_RemoveFromBatch extends CRM_Contribute_Form_Task
   public function preProcess() {
     parent::preProcess();
 
-    if ($this->isSubmitted()) {
+    if ($this->controller instanceof CRM_Contribute_Controller_Search && $this->isSubmitted()) {
       return;
     }
 
@@ -45,7 +45,7 @@ class CRM_Civigiftaid_Form_Task_RemoveFromBatch extends CRM_Contribute_Form_Task
   }
 
   public function buildQuickForm() {
-    if ($this->isSubmitted()) {
+    if ($this->controller instanceof CRM_Contribute_Controller_Search && $this->isSubmitted()) {
       return;
     }
 
