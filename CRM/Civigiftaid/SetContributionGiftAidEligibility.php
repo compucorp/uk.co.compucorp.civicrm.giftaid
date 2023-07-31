@@ -50,6 +50,10 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * This function checks if the contribution is eligible and automatically sets
    * the status to yes, else, it sets it to No.
    *
+   * Note that this is designed to be called as part of specific workflows and is not suited
+   * to general purpose use. For example, it will never recalculate existing eligibility against
+   * the current configured financial types.
+   *
    * @param int $contributionID
    *   Contribution Id.
    * @param string $action
