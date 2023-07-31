@@ -18,15 +18,15 @@
     <author>MJW Consulting, Rich Lott (Artful Robot) Erawat Chamanont, Jamie Novick, Guanhuan Chen, Robin Mitra</author>
     <email>mjw@mjwconsult.co.uk, https://artfulrobot.uk, jamie@compucorp.co.uk, guanhuan@compucorp.co.uk</email>
   </maintainer>
-  <releaseDate>2022-09-26</releaseDate>
-  <version>3.5.2</version>
-  <develStage>stable</develStage>
+  <releaseDate>2023-07-31</releaseDate>
+  <version>3.5.3-dev</version>
+  <develStage>beta</develStage>
   <compatibility>
-    <ver>5.49</ver>
+    <ver>5.59</ver>
   </compatibility>
   <civix>
     <namespace>CRM/Civigiftaid</namespace>
-    <format>22.10.0</format>
+    <format>23.02.1</format>
   </civix>
   <classloader>
     <psr0 prefix="CRM_" path="."/>
@@ -36,8 +36,11 @@
     <mixin>menu-xml@1.0.0</mixin>
     <mixin>mgd-php@1.0.0</mixin>
     <mixin>setting-php@1.0.0</mixin>
+    <mixin>smarty-v2@1.0.1</mixin>
+    <mixin>entity-types-php@1.0.0</mixin>
   </mixins>
   <classloader>
     <psr0 prefix="CRM_" path="."/>
   </classloader>
+  <upgrader>CRM_Civigiftaid_Upgrader</upgrader>
 </extension>
