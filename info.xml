@@ -39,8 +39,5 @@
     <mixin>smarty-v2@1.0.1</mixin>
     <mixin>entity-types-php@1.0.0</mixin>
   </mixins>
-  <classloader>
-    <psr0 prefix="CRM_" path="."/>
-  </classloader>
   <upgrader>CRM_Civigiftaid_Upgrader</upgrader>
 </extension>
