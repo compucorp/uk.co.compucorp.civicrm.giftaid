@@ -125,6 +125,7 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
     $contributionParams['entity_id'] = $contributionID;
     // We use CustomValue.create instead of Contribution.create because Contribution.create is way too slow
+    // (and might create an infinite loop, due to listeners on the post commit hook)
     civicrm_api3('CustomValue', 'create', $contributionParams);
   }
 
