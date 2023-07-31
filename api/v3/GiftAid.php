@@ -164,8 +164,8 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   if (!empty($params['contribution_id'])) {
     $contributions->addWhere('id', '=', $params['contribution_id']);
   }
-  $contributions->execute()->indexBy('id');
-  if (empty($contributions)) {
+  $contributionsResult = $contributions->execute()->indexBy('id');
+  if ($contributionsResult->count() < 1) {
     return civicrm_api3_create_error('No contributions found or none have Eligible flag set!');
   }
 
@@ -180,7 +180,7 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   }
 
   try {
-    foreach ($contributions as $contributionID => $contributionDetail) {
+    foreach ($contributionsResult as $contributionID => $contributionDetail) {
       // Check batch name here because it may be NULL or empty string and we can't check that using API3.
       if (!empty($params['batch_name']) && ($params['batch_name'] !== $contributionDetail['gift_aid.batch_name'])) {
         // We specified a specific batch name to process and this contribution is not part of that batch
