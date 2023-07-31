@@ -93,4 +93,34 @@ class CRM_Civigiftaid_Settings {
     return [];
   }
 
+  /**
+   * Used by civigiftaid_financial_types_enabled setting.
+   *
+   * This is because we want to include inactive financial types, since
+   * a recurring contribution could be set up with a ft that is later set
+   * inactive (as in not used for new recurs) but the contributions still
+   * roll in.
+   *
+   * Inactive types are listed after the active ones, and are prefixed (Inactive) to help the UI.
+   */
+  public static function allFinancialTypes() {
+    if (!isset(Civi::$statics[__METHOD__])) {
+      $rows = \Civi\Api4\FinancialType::get(FALSE)
+      ->addSelect('name', 'is_active')
+      ->addWhere('is_active', 'IN', [false, true])
+      ->addOrderBy('is_active', 'DESC')
+      ->addOrderBy('name', 'ASC')
+      ->execute()->indexBy('id');
+      $map = [];
+      foreach ($rows as $id => $row) {
+        $map[$id] =
+          ($row['is_active'] ? '' : '(Inactive) ')
+          . $row['name'];
+      }
+
+      Civi::$statics[__METHOD__] = $map;
+    }
+    return Civi::$statics[__METHOD__];
+  }
+
 }
