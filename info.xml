@@ -19,8 +19,8 @@
     <email>mjw@mjwconsult.co.uk, https://artfulrobot.uk, jamie@compucorp.co.uk, guanhuan@compucorp.co.uk</email>
   </maintainer>
   <releaseDate>2023-07-31</releaseDate>
-  <version>3.5.3-dev</version>
-  <develStage>beta</develStage>
+  <version>3.5.3</version>
+  <develStage>stable</develStage>
   <compatibility>
     <ver>5.59</ver>
   </compatibility>
