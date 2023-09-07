@@ -42,7 +42,7 @@ class CRM_Civigiftaid_Hook_Post_SetContributionGiftAidEligibility {
    */
   private function setGiftAidEligibilityStatus($contributionId) {
     $currentPath = CRM_Utils_System::currentPath();
-    if (!in_array($currentPath, $this->getRequiredPaths())) {
+    if (!$this->isAllowedPath($currentPath)) {
       return;
     }
 
@@ -147,20 +147,26 @@ class CRM_Civigiftaid_Hook_Post_SetContributionGiftAidEligibility {
     catch (Exception $e) {}
   }
 
-
   /**
-   * Returns paths/Urls where that needs this functionality implemented.
+   * Checks if the given path requires giftaid processing.
    *
-   * @return array
-   *   Required paths.
+   * @param $path
+   *   Path to be evaluated.
+   *
+   * @return bool
+   *   If the path is one of the ones that needs to be processed for giftaid
+   *   info.
    */
-  private function getRequiredPaths() {
-    return [
-      'civicrm/member/add', // Add membership page
-      'civicrm/contact/view/membership', // Add membership from contact view page
-      'civicrm/participant/add', // Register event participant page
-      'civicrm/contact/view/participant' //Add participant from contact view page
+  private function isAllowedPath($path) {
+    $allowedPaths = [
+      'civicrm/member/add',               // Add membership page
+      'civicrm/contact/view/membership',  // Add membership from contact view page
+      'civicrm/participant/add',          // Register event participant page
+      'civicrm/contact/view/participant', // Add participant from contact view page
+      'civicrm/contribute/transact',      // Create contribution from contribution page
     ];
+
+    return in_array($path, $allowedPaths);
   }
 
   /**
