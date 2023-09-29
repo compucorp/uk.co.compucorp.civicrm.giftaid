@@ -45,7 +45,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
     // Import existing batches.
     self::importBatches();
     // In case this extension had been installed and uninstalled before:
-    $this->removeLegacyRegisteredReport();
+    self::removeLegacyRegisteredReport();
   }
 
   public function postInstall() {
@@ -521,7 +521,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
 
   public function upgrade_3103() {
     $this->log('Applying update 3103 - delete old report templates');
-    $this->removeLegacyRegisteredReport();
+    self::removeLegacyRegisteredReport();
     return TRUE;
   }
 
