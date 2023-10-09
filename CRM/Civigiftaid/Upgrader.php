@@ -701,6 +701,20 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3119() {
+    $this->log('Update batch name instead of ID');
+
+    $sql = "
+      UPDATE civicrm_option_value cov
+        INNER JOIN civicrm_option_group cog ON cov.option_group_id = cog.id
+      SET cov.value=cov.name
+      WHERE cog.name = 'giftaid_batch_name'
+      ";
+    CRM_Core_DAO::executeQuery($sql);
+
+    return TRUE;
+  }
+
   /**
    * Add the specified option group, gracefully if it already exists.
    *
