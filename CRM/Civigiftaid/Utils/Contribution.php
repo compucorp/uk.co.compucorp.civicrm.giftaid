@@ -1,158 +1,71 @@
 <?php
-
 /*
  +--------------------------------------------------------------------+
- | CiviCRM version 4.3                                               |
- +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2011                                |
- +--------------------------------------------------------------------+
- | This file is a part of CiviCRM.                                    |
+ | Copyright CiviCRM LLC. All rights reserved.                        |
  |                                                                    |
- | CiviCRM is free software; you can copy, modify, and distribute it  |
- | under the terms of the GNU Affero General Public License           |
- | Version 3, 19 November 2007 and the CiviCRM Licensing Exception.   |
- |                                                                    |
- | CiviCRM is distributed in the hope that it will be useful, but     |
- | WITHOUT ANY WARRANTY; without even the implied warranty of         |
- | MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.               |
- | See the GNU Affero General Public License for more details.        |
- |                                                                    |
- | You should have received a copy of the GNU Affero General Public   |
- | License and the CiviCRM Licensing Exception along                  |
- | with this program; if not, contact CiviCRM LLC                     |
- | at info[AT]civicrm[DOT]org. If you have questions about the        |
- | GNU Affero General Public License or the licensing of CiviCRM,     |
- | see the CiviCRM license FAQ at http://civicrm.org/licensing        |
+ | This work is published under the GNU AGPLv3 license with some      |
+ | permitted exceptions and without any warranty. For full license    |
+ | and copyright information, see https://civicrm.org/licensing       |
  +--------------------------------------------------------------------+
-*/
-
-/**
- *
- * @package   CRM
- * @copyright CiviCRM LLC (c) 2004-2013
- * $Id$
- *
  */
 
+use Civi\Api4\Contribution;
+use CRM_Civigiftaid_ExtensionUtil as E;
+
 /**
- *
- * @package   CRM
- * @copyright CiviCRM LLC (c) 2004-2013
- * $Id$
- *
+ * Class CRM_Civigiftaid_Utils_Contribution
  */
 class CRM_Civigiftaid_Utils_Contribution {
 
   /**
-   * Given an array of contributionIDs, add them to a batch
+   * Given an array of contributionIDs, re-check validity and add them to a batch
    *
-   * @param array $contributionIDs (reference ) the array of contribution ids to be added
-   * @param int   $batchID         - the batchID to be added to
+   * @param array $contributionIDs
+   * @param int $batchID
    *
-   * @return array             (total, added, notAdded) ids of contributions added to the batch
-   * @access public
-   * @static
+   * @return array
+   *           (total, addedContributionIDs, notAddedContributionIDs) ids of contributions added to the batch
+   * @throws \CRM_Extension_Exception
+   * @throws \CiviCRM_API3_Exception
    */
   public static function addContributionToBatch($contributionIDs, $batchID) {
-    $date = date('YmdHis');
-    $contributionsAdded = array();
-    $contributionsNotAdded = array();
-
-    require_once "CRM/Civigiftaid/Utils/GiftAid.php";
-    require_once "CRM/Contribute/BAO/Contribution.php";
-    require_once 'CRM/Batch/DAO/EntityBatch.php';
-    require_once "CRM/Core/BAO/Address.php";
-    require_once "CRM/Contact/BAO/Contact.php";
-    require_once "CRM/Utils/Address.php";
+    $contributionsAdded = [];
+    $contributionsNotAdded = [];
 
     // Get the batch name
-    require_once 'CRM/Batch/DAO/Batch.php';
-    $batch = new CRM_Batch_DAO_Batch();
-    $batch->id = $batchID;
-    $batch->find(TRUE);
-    $batchName = $batch->title;
+    $batchName = civicrm_api3('Batch', 'getvalue', [
+      'return' => 'name',
+      'id' => $batchID,
+    ]);
 
-    $batchNameGroup = civicrm_api(
-      'OptionGroup',
-      'getsingle',
-      array('version' => 3, 'sequential' => 1, 'name' => 'giftaid_batch_name')
-    );
-    if ($batchNameGroup['id']) {
-      $groupId = $batchNameGroup['id'];
-      $params = array(
-        'version'         => 3,
-        'sequential'      => 1,
-        'option_group_id' => $groupId,
-        'value'           => $batchName,
-        'label'           => $batchName
-      );
-      $result = civicrm_api('OptionValue', 'create', $params);
-    }
-
-    $charityColumnExists = CRM_Core_DAO::checkFieldExists(
-      'civicrm_value_gift_aid_submission',
-      'charity'
-    );
-
-    $contributionsInBatch = self::getContributionsInBatch($contributionIDs);
-    foreach ($contributionIDs as $contributionID) {
+    // Get all contributions from found IDs that are not already in a batch
+    $contributions = Contribution::get(FALSE)
+      ->addWhere('id', 'IN', $contributionIDs)
+      ->addSelect('*', 'custom.*')
+      ->execute();
+    foreach ($contributions as $contribution) {
       // check if the selected contribution id already in a batch
-      // if not, add to batchContribution else keep the count of contributions that are not added
-      if (in_array($contributionID, $contributionsInBatch, true)) {
-        $contributionsNotAdded[] = $contributionID;
+      if (!empty($contribution['gift_aid.batch_name'])) {
+        $contributionsNotAdded[] = $contribution['id'];
         continue;
       }
 
-      $batchContribution = new CRM_Batch_DAO_EntityBatch();
-      $batchContribution->entity_table = 'civicrm_contribution';
-      $batchContribution->entity_id = $contributionID;
-
-      // get additional info
-      // get contribution details from Contribution using contribution id
-      $params = array('id' => $contributionID);
-      CRM_Contribute_BAO_Contribution::retrieve($params, $contribution, $ids);
-      $contactId = $contribution['contact_id'];
-
       // check if contribution is valid for gift aid
-      if (CRM_Civigiftaid_Utils_GiftAid::isEligibleForGiftAid(
-          $contactId,
-          $contribution['receive_date'],
-          $contributionID
-        ) AND $contribution['contribution_status_id'] == 1
+      if (self::isEligibleForGiftAid($contribution)
+        && ($contribution['contribution_status_id'] == CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Completed'))
       ) {
-        $batchContribution->batch_id = $batchID;
-        $batchContribution->save();
+        civicrm_api3('EntityBatch', 'create', [
+          'entity_id' => $contribution['id'],
+          'batch_id' => $batchID,
+          'entity_table' => 'civicrm_contribution',
+        ]);
 
-        $giftAidableContribAmt = self::getGiftAidableContribAmt(
-          $contribution['total_amount'], $contributionID
-        );
+        self::updateGiftAidFields($contribution['id'], NULL, $batchName, $addToBatch = TRUE);
 
-        // get gift aid amount
-        $giftAidAmount = static::calculateGiftAidAmt($giftAidableContribAmt, static::getBasicRateTax());
-
-        // FIXME: check if there is customTable method
-        $query = "
-                          INSERT INTO civicrm_value_gift_aid_submission
-                          (entity_id, eligible_for_gift_aid, gift_aid_amount , amount , batch_name)
-                          VALUES
-                            ( %1, 1, %2, %3 , %4 )
-                          ON DUPLICATE KEY UPDATE
-                          gift_aid_amount = %2 ,
-                          amount = %3 ,
-                          batch_name = %4
-                          ";
-        $sqlParams = array(
-          1 => array($contributionID, 'Integer'),
-          2 => array($giftAidAmount, 'Money'),
-          3 => array($contribution['total_amount'], 'Money'),
-          4 => array($batchName, 'String'),
-        );
-        CRM_Core_DAO::executeQuery($query, $sqlParams);
-
-        $contributionsAdded[] = $contributionID;
+        $contributionsAdded[] = $contribution['id'];
       }
       else {
-        $contributionsNotAdded[] = $contributionID;
+        $contributionsNotAdded[] = $contribution['id'];
       }
     }
 
@@ -165,59 +78,96 @@ class CRM_Civigiftaid_Utils_Contribution {
       );
     }
 
-    return array(
+    return [
       count($contributionIDs),
-      count($contributionsAdded),
-      count($contributionsNotAdded)
-    );
+      $contributionsAdded,
+      $contributionsNotAdded
+    ];
   }
 
-  public static function removeContributionFromBatch($contributionIDs) {
-    $contributionRemoved = array();
-    $contributionNotRemoved = array();
+  /**
+   * @param int $contributionID
+   * @param int $eligibleForGiftAid - if this is NULL if will NOT be set, otherwise set it to eg CRM_Civigiftaid_Utils_GiftAid::DECLARATION_IS_YES
+   * @param string $batchName - if this is set to NULL it will NOT be changed
+   * @param bool $updateIfHasBatchName - You must set this to TRUE to modify the batchName
+   *
+   * @throws \CRM_Extension_Exception
+   * @throws \CiviCRM_API3_Exception
+   */
+  public static function updateGiftAidFields($contributionID, $eligibleForGiftAid = NULL, $batchName = '', $updateIfHasBatchName = FALSE) {
+    if (!empty($batchName) && !$updateIfHasBatchName) {
+      // Don't touch this contribution - it's already part of a batch
+      // and we're not being called to clear the batch (e.g. new contribution in a recurring contribution).
+      return;
+    }
 
-    list($total, $contributionsToRemove, $notInBatch, $alreadySubmited) =
+    if ($batchName !== NULL) {
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid')] = $batchName;
+    }
+    if (isset($eligibleForGiftAid)) {
+      $eligibleForGiftAid = (int) $eligibleForGiftAid;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
+      if ($eligibleForGiftAid === 0) {
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = NULL;
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = NULL;
+      }
+      else {
+        // Eligible - calculate gift aid amounts
+        $totalAmount = Contribution::get(FALSE)
+          ->addWhere('id', '=', $contributionID)
+          ->execute()
+          ->first()['total_amount'];
+        $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
+        $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = $giftAidAmount;
+        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = $giftAidableContribAmt;
+      }
+    }
+    $contributionParams['entity_id'] = $contributionID;
+    // We use CustomValue.create instead of Contribution.create because Contribution.create is way too slow
+    civicrm_api3('CustomValue', 'create', $contributionParams);
+  }
+
+  /**
+   * @param array $contributionIDs
+   *
+   * @return array
+   * @throws \CiviCRM_API3_Exception
+   */
+  public static function removeContributionFromBatch($contributionIDs) {
+    $contributionIDsRemoved = [];
+    $contributionIDsNotRemoved = [];
+
+    list($total, $contributionsIDsToRemove, $notInBatch, $alreadySubmitted) =
       self::validationRemoveContributionFromBatch($contributionIDs);
 
-    require_once 'CRM/Batch/BAO/Batch.php';
-    $contributions = self::getContributionDetails($contributionsToRemove);
+    $contributions = self::getContributionDetails($contributionsIDsToRemove);
 
-    if (!empty($contributions)) {
-      foreach ($contributions as $contribution) {
-        if (!empty($contribution['batch_id'])) {
+    foreach ($contributions as $contribution) {
+      if (!empty($contribution['batch_id'])) {
 
-          $batchContribution = new CRM_Batch_DAO_EntityBatch();
-          $batchContribution->entity_table = 'civicrm_contribution';
-          $batchContribution->entity_id = $contribution['contribution_id'];
-          $batchContribution->batch_id = $contribution['batch_id'];
-          $batchContribution->delete();
+        $batchContribution = new CRM_Batch_DAO_EntityBatch();
+        $batchContribution->entity_table = 'civicrm_contribution';
+        $batchContribution->entity_id = $contribution['contribution_id'];
+        $batchContribution->batch_id = $contribution['batch_id'];
+        $batchContribution->delete();
 
-          // FIXME: check if there API to user
-          $query = "UPDATE civicrm_value_gift_aid_submission
-                      SET gift_aid_amount = NULL,
-                          amount = NULL,
-                          batch_name = NULL
-                      WHERE entity_id = %1";
-
-          $sqlParams = array(
-            1 => array($contribution['contribution_id'], 'Integer')
-          );
-          CRM_Core_DAO::executeQuery($query, $sqlParams);
-
-          array_push($contributionRemoved, $contribution['contribution_id']);
-
-        }
-        else {
-          array_push($contributedNotRemoved, $contribution['contribution_id']);
-        }
+        Contribution::update(FALSE)
+          ->addWhere('id', '=', $contribution['contribution_id'])
+          ->addValue('gift_aid.batch_name', NULL)
+          ->execute();
+        $contributionIDsRemoved[] = $contribution['contribution_id'];
+      }
+      else {
+        $contributionIDsNotRemoved[] = $contribution['contribution_id'];
       }
     }
 
-    return array(
+    return [
       count($contributionIDs),
-      count($contributionRemoved),
-      count($contributionNotRemoved)
-    );
+      $contributionIDsRemoved,
+      $contributionIDsNotRemoved
+    ];
   }
 
   /**
@@ -225,7 +175,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * having financial type which have been enabled in Gift Aid extension's
    * settings.
    *
-   * @param $contributionId
+   * @param int $contributionId
    *
    * @return float|int
    */
@@ -233,26 +183,25 @@ class CRM_Civigiftaid_Utils_Contribution {
     $sql = "
       SELECT SUM(line_total) total
       FROM civicrm_line_item
-      WHERE contribution_id = {$contributionId}";
+      WHERE contribution_id = %1";
+    $sqlParams = [1 => [$contributionId, 'Int']];
 
-    if (!CRM_Civigiftaid_Form_Admin::isGloballyEnabled()) {
-      $enabledTypes = CRM_Civigiftaid_Form_Admin::getFinancialTypesEnabled();
+    if (!(bool) \Civi::settings()->get('civigiftaid_globally_enabled')) {
+      $enabledTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
+      if (empty($enabledTypes)) {
+        // if no financial types are selected
+        return 0;
+      }
       $enabledTypesStr = implode(', ', $enabledTypes);
-
-      // if no financial types are selected, don't return anything from query
-      $sql .= $enabledTypesStr
-        ? " AND financial_type_id IN ({$enabledTypesStr})"
-        : " AND 0";
+      $sql .= " AND financial_type_id IN ({$enabledTypesStr})";
     }
 
-    $dao = CRM_Core_DAO::executeQuery($sql);
-
-    $contributionAmount = 0;
-    while ($dao->fetch()) {
-      $contributionAmount = (float) $dao->total;
+    $dao = CRM_Core_DAO::executeQuery($sql, $sqlParams);
+    if ($dao->fetch()) {
+      return (float) $dao->total;
     }
 
-    return $contributionAmount;
+    return 0;
   }
 
   /**
@@ -260,8 +209,6 @@ class CRM_Civigiftaid_Utils_Contribution {
    * Formula used is: (contributed amount * basic rate of year) / (100 - basic rate of year)
    * E.g. For a donation of £100 and basic rate of tax of 20%, gift aid amount = £100 * 20 / 80. In other words, £25
    * for every £100, or 25p for every £1.
-   *
-   * TODO: Move to utils.
    *
    * @param $contribAmt
    * @param $basicTaxRate
@@ -274,74 +221,72 @@ class CRM_Civigiftaid_Utils_Contribution {
 
   /**
    * Get the basic tax rate currently defined in the settings.
-   * TODO: Cache result.
-   * TODO: Move to utils.
    *
-   * @return mixed
+   * @return float
    * @throws \CRM_Extension_Exception
+   * @throws \CiviCRM_API3_Exception
    */
   public static function getBasicRateTax() {
-    $rate = NULL;
+    if (!isset(Civi::$statics[__CLASS__]['basictaxrate'])) {
+      $rate = NULL;
 
-    $gResult = civicrm_api(
-      'OptionGroup',
-      'getsingle',
-      array('version' => 3, 'name' => 'giftaid_basic_rate_tax')
-    );
+      $gResult = civicrm_api3('OptionGroup', 'getsingle', ['name' => 'giftaid_basic_rate_tax']);
 
-    if ($gResult['id']) {
-      $params = array(
-        'version'         => 3,
-        'sequential'      => 1,
-        'option_group_id' => $gResult['id'],
-        'name'            => 'basic_rate_tax',
-      );
+      if ($gResult['id']) {
+        $params = [
+          'sequential' => 1,
+          'option_group_id' => $gResult['id'],
+          'name' => 'basic_rate_tax',
+        ];
+        $result = civicrm_api3('OptionValue', 'get', $params);
 
-      $result = civicrm_api('OptionValue', 'get', $params);
-
-      if ($result['values']) {
-        foreach ($result['values'] as $ov) {
-          if ($result['id'] == $ov['id'] && $ov['value'] !== '') {
-            $rate = $ov['value'];
+        if ($result['values']) {
+          foreach ($result['values'] as $ov) {
+            if ($result['id'] == $ov['id'] && $ov['value'] !== '') {
+              $rate = $ov['value'];
+            }
           }
         }
       }
-    }
 
-    if (is_null($rate)) {
-      throw new CRM_Extension_Exception(
-        'Basic Tax Rate not currently set! Please set it in the Gift Aid extension settings.'
-      );
-    }
+      if (is_null($rate)) {
+        throw new CRM_Extension_Exception(
+          'Basic Tax Rate not currently set! Please set it in the Gift Aid extension settings.'
+        );
+      }
 
-    return (float) $rate;
+      Civi::$statics[__CLASS__]['basictaxrate'] = (float) $rate;
+    }
+    return Civi::$statics[__CLASS__]['basictaxrate'];
   }
 
   /**
    * @return bool
    */
   public static function isOnlineSubmissionExtensionInstalled() {
-    $extensions = CRM_Core_PseudoConstant::getModuleExtensions();
-    foreach ($extensions as $key => $extension) {
-      if ($extension['prefix'] == 'giftaidonline') {
-        return TRUE;
-      }
+    try {
+      civicrm_api3('Extension', 'getsingle', [
+        'is_active' => 1,
+        'full_name' => 'uk.co.vedaconsulting.module.giftaidonline',
+      ]);
     }
-    return FALSE;
+    catch (Exception $e) {
+      return FALSE;
+    }
+    return TRUE;
   }
 
   /**
-   * @param $contributionIDs
+   * @param array $contributionIDs
    *
    * @return array
    */
-  public static function validationRemoveContributionFromBatch(&$contributionIDs) {
-    $contributionsAlreadySubmited = array();
-    $contributionsNotInBatch = array();
-    $contributionsToRemove = array();
+  public static function validationRemoveContributionFromBatch($contributionIDs) {
+    $contributionsAlreadySubmitted = [];
+    $contributionsNotInBatch = [];
+    $contributionsToRemove = [];
 
     foreach ($contributionIDs as $contributionID) {
-
       $batchContribution = new CRM_Batch_DAO_EntityBatch();
       $batchContribution->entity_table = 'civicrm_contribution';
       $batchContribution->entity_id = $contributionID;
@@ -350,8 +295,8 @@ class CRM_Civigiftaid_Utils_Contribution {
       if ($batchContribution->find(TRUE)) {
         if (self::isOnlineSubmissionExtensionInstalled()) {
 
-          if (self::isBatchAlreadySubmited($batchContribution->batch_id)) {
-            $contributionsAlreadySubmited[] = $contributionID;
+          if (self::isBatchAlreadySubmitted($batchContribution->batch_id)) {
+            $contributionsAlreadySubmitted[] = $contributionID;
           }
           else {
             $contributionsToRemove[] = $contributionID;
@@ -366,12 +311,12 @@ class CRM_Civigiftaid_Utils_Contribution {
       }
     }
 
-    return array(
+    return [
       count($contributionIDs),
       $contributionsToRemove,
       $contributionsNotInBatch,
-      $contributionsAlreadySubmited
-    );
+      $contributionsAlreadySubmitted
+    ];
   }
 
   /**
@@ -379,106 +324,101 @@ class CRM_Civigiftaid_Utils_Contribution {
    * 1 - if contribution_id already inserted in batch_contribution
    * 2 - if contributions are not valid for gift aid
    *
-   * @param $contributionIDs
+   * @param array $contributionIDs
    *
    * @return array
+   * @throws \CRM_Extension_Exception
+   * @throws \CiviCRM_API3_Exception
    */
-  public static function validateContributionToBatch(&$contributionIDs) {
-    $contributionsAdded = array();
-    $contributionsAlreadyAdded = array();
-    $contributionsNotValid = array();
+  public static function validateContributionToBatch($contributionIDs) {
+    $contributionsAdded = [];
+    $contributionsAlreadyAdded = [];
 
-    require_once "CRM/Civigiftaid/Utils/GiftAid.php";
-    //require_once "CRM/Core/DAO/EntityBatch.php";
-    require_once "CRM/Batch/DAO/EntityBatch.php";
-    require_once "CRM/Contribute/BAO/Contribution.php";
+    // Get all contributions from found IDs that are not already in a batch
+    $contributions = Contribution::get(FALSE)
+      ->addSelect('*', 'custom.*')
+      ->addWhere('id', 'IN', $contributionIDs)
+      ->addWhere('receive_date', '<=', 'now')
+      ->execute()
+      ->indexBy('id')
+      ->getArrayCopy();
 
-    $contributionsInBatch = self::getContributionsInBatch($contributionIDs);
-    foreach ($contributionIDs as $contributionID) {
-      // check if the selected contribution id already in a batch
-      // if not, increment $numContributionsAdded else keep the count of contributions that are already added
-      if (!in_array($contributionID, $contributionsInBatch, TRUE)) {
-        // get contact_id, & contribution receive date from Contribution using contribution id
-        $params = array('id' => $contributionID);
-        CRM_Contribute_BAO_Contribution::retrieve($params, $defaults, $ids);
+    // Add contribution IDs that were not matched (eg. receive_date is in the future)
+    $contributionsNotValid = array_diff($contributionIDs, array_keys($contributions));
 
-        // check if contribution is not valid for gift aid, increment $numContributionsNotValid
-        if (CRM_Civigiftaid_Utils_GiftAid::isEligibleForGiftAid(
-            $defaults['contact_id'],
-            $defaults['receive_date'], $contributionID
-          ) AND $defaults['contribution_status_id'] == 1
-        ) {
-          $contributionsAdded[] = $contributionID;
-        }
-        else {
-          $contributionsNotValid[] = $contributionID;
-        }
+    foreach ($contributions as $contribution) {
+      if (!empty($contribution['gift_aid.batch_name'])) {
+        $contributionsAlreadyAdded[] = $contribution['id'];
+      }
+      elseif (self::isEligibleForGiftAid($contribution)
+        && ($contribution['contribution_status_id'] == CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Completed'))
+      ) {
+        $contributionsAdded[] = $contribution['id'];
+        self::updateGiftAidFields($contribution['id']);
       }
       else {
-        $contributionsAlreadyAdded[] = $contributionID;
+        $contributionsNotValid[] = $contribution['id'];
       }
     }
 
-    return array(
+    return [
       count($contributionIDs),
       $contributionsAdded,
       $contributionsAlreadyAdded,
       $contributionsNotValid
-    );
+    ];
   }
 
-  /*
-     * this function returns the array of batchID & title
-     */
-  public static function getBatchIdTitle($orderBy = 'id') {
-    $query = "SELECT * FROM civicrm_batch ORDER BY " . $orderBy;
+  /**
+   * Returns the array of batchID & title
+   *
+   * @return array
+   */
+  public static function getBatchIdTitle() {
+    $query = "SELECT * FROM civicrm_batch ORDER BY id DESC";
     $dao = CRM_Core_DAO::executeQuery($query);
 
-    $result = array();
+    $result = [];
     while ($dao->fetch()) {
-      $result[$dao->id] = $dao->id . " - " . $dao->title;
+      $result[$dao->id] = $dao->title;
     }
     return $result;
   }
 
   /*
-   * this function returns the array of contribution
-   * @param array  $contributionIDs an array of contribution ids
-   * @return array $result an array of contributions
+   * Returns the array of contributions
+   *
+   * @param array $contributionIds
+   *
+   * @return array
    */
   public static function getContributionDetails($contributionIds) {
-    $result = array();
+    $contributionDetails = [];
 
     if (empty($contributionIds)) {
-      return $result;
+      return $contributionDetails;
     }
 
     $contributionIdStr = implode(',', $contributionIds);
+    $contributionDetails = self::addContributionDetails($contributionIdStr, $contributionDetails);
 
-    self::addContributionDetails($contributionIdStr, $result);
-
-    if (count($result)) {
-      array_walk($result, function(&$contribution) {
-        $contribution['line_items'] = [];
-      });
-
-      self::addLineItemDetails($contributionIdStr, $result);
-    }
-
-    return $result;
+    return $contributionDetails;
   }
 
-  /*
-   * this function is to check if the batch is already submited to HMRC using GiftAidOnline Module
-   * @param integer  $batchId a batchId
-   * @return true if already submited and if not
+  /**
+   * this function is to check if the batch is already submitted to HMRC using GiftAidOnline Module
+   *
+   * @param int $pBatchId a batchId
+   *
+   * @return true if already submitted and if not
    */
-  public static function isBatchAlreadySubmited($pBatchId) {
-    require_once 'CRM/Giftaidonline/Page/OnlineSubmission.php';
+  public static function isBatchAlreadySubmitted($pBatchId) {
+    if (!self::isOnlineSubmissionExtensionInstalled()) {
+      return FALSE;
+    }
 
     $onlineSubmission = new CRM_Giftaidonline_Page_OnlineSubmission();
     $bIsSubmitted = $onlineSubmission->is_submitted($pBatchId);
-
     return $bIsSubmitted;
   }
 
@@ -506,139 +446,276 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
   }
 
-  /////////////////////
-  // Private Methods //
-  /////////////////////
-
   /**
-   * @param       $contributionIdStr
-   * @param array $result
+   * @param string $contributionIdStr
+   * @param array $contributionDetails
    *
    * @return array
+   * @throws \CiviCRM_API3_Exception
    */
-  private static function addContributionDetails(
-    $contributionIdStr,
-    array &$result
-  ) {
+  private static function addContributionDetails($contributionIdStr, $contributionDetails) {
+    // Get all contributions from found IDs that are not already in a batch
+    $group = civicrm_api3('CustomGroup', 'getsingle', [
+      'return' => ['id', 'table_name'],
+      'name' => "gift_aid",
+    ]);
+
     $query = "
-      SELECT  contribution.id, contact.id contact_id, contact.display_name, contribution.total_amount, contribution.currency,
+      SELECT  contribution.id, contact.id contact_id, contact.display_name, contribution.total_amount, contribution.currency, giftaidsubmission.gift_aid_amount,
               financial_type.name, contribution.source, contribution.receive_date, batch.title, batch.id as batch_id
       FROM civicrm_contribution contribution
       LEFT JOIN civicrm_contact contact ON ( contribution.contact_id = contact.id )
       LEFT JOIN civicrm_financial_type financial_type ON ( financial_type.id = contribution.financial_type_id  )
       LEFT JOIN civicrm_entity_batch entity_batch ON ( entity_batch.entity_id = contribution.id )
       LEFT JOIN civicrm_batch batch ON ( batch.id = entity_batch.batch_id )
-      WHERE contribution.id IN ({$contributionIdStr})";
+      LEFT JOIN {$group['table_name']} giftaidsubmission ON ( contribution.id = giftaidsubmission.entity_id )
+      WHERE contribution.id IN (%1)";
 
-    $dao = CRM_Core_DAO::executeQuery($query);
+    $queryParams[1] = [$contributionIdStr, 'CommaSeparatedIntegers'];
+    $dao = CRM_Core_DAO::executeQuery($query, $queryParams);
 
     while ($dao->fetch()) {
-      $result[$dao->id]['contact_id'] = $dao->contact_id;
-      $result[$dao->id]['contribution_id'] = $dao->id;
-      $result[$dao->id]['display_name'] = $dao->display_name;
-      $result[$dao->id]['gift_aidable_amount'] = CRM_Utils_Money::format(
-        static::getGiftAidableContribAmt($dao->total_amount, $dao->id),
-        $dao->currency
-      );
-      $result[$dao->id]['total_amount'] = CRM_Utils_Money::format(
-        $dao->total_amount, $dao->currency
-      );
-      $result[$dao->id]['financial_account'] = $dao->name;
-      $result[$dao->id]['source'] = $dao->source;
-      $result[$dao->id]['receive_date'] = $dao->receive_date;
-      $result[$dao->id]['batch'] = $dao->title;
-      $result[$dao->id]['batch_id'] = $dao->batch_id;
+      $contributionDetails[$dao->id]['contact_id'] = $dao->contact_id;
+      $contributionDetails[$dao->id]['contribution_id'] = $dao->id;
+      $contributionDetails[$dao->id]['display_name'] = $dao->display_name;
+      $contributionDetails[$dao->id]['gift_aidable_amount'] = $dao->gift_aid_amount;
+      $contributionDetails[$dao->id]['total_amount'] = $dao->total_amount;
+      $contributionDetails[$dao->id]['currency'] = $dao->currency;
+      $contributionDetails[$dao->id]['financial_account'] = $dao->name;
+      $contributionDetails[$dao->id]['source'] = $dao->source;
+      $contributionDetails[$dao->id]['receive_date'] = $dao->receive_date;
+      $contributionDetails[$dao->id]['batch'] = $dao->title;
+      $contributionDetails[$dao->id]['batch_id'] = $dao->batch_id;
+      $contributionDetails[$dao->id]['line_items_count'] = 0;
+
+      CRM_Utils_System::url('civicrm/contact/view/contribution', 'reset=1&&action=view&id=255&cid=202');
+      $contributionDetails[$dao->id]['actions'] = self::getActionLinks($dao->contact_id, $dao->id);
     }
+
+    if (count($contributionDetails)) {
+      $contributionDetails = self::countLineItems($contributionIdStr, $contributionDetails);
+    }
+    return $contributionDetails;
+  }
+
+  private static function getActionLinks($contactID, $contributionID) {
+    $viewURL = CRM_Utils_System::url('civicrm/contact/view/contribution', "reset=1&&action=view&id={$contributionID}&cid={$contactID}");
+    return "<a href='{$viewURL}' class='crm-popup'>" . E::ts('View') . "</a>";
   }
 
   /**
-   * @param       $contributionIdStr
-   * @param array $result
+   * This gets a count of all lineitems for a contribution for display on the "Add to Batch" list.
    *
-   * @return mixed
+   * @param string $contributionIdStr
+   * @param array $contributionDetails
+   *
+   * @return array
    */
-  private static function addLineItemDetails(
-    $contributionIdStr,
-    array &$result
-  ) {
-    $query = "
-      SELECT c.id, i.entity_table, i.label, i.line_total, i.qty, c.currency, t.name
-      FROM civicrm_contribution c
-      LEFT JOIN civicrm_line_item i
-      ON c.id = i.contribution_id
-      LEFT JOIN civicrm_financial_type t
-      ON i.financial_type_id = t.id
-      WHERE c.id IN ($contributionIdStr)";
+  private static function countLineItems($contributionIdStr, $contributionDetails) {
+    $query = "SELECT i.contribution_id as contribution_id, COUNT(i.contribution_id) as line_item_count
+      FROM civicrm_line_item i
+      WHERE i.contribution_id IN (%1)";
+    $queryParams[1] = [$contributionIdStr, 'CommaSeparatedIntegers'];
 
-    if (!CRM_Civigiftaid_Form_Admin::isGloballyEnabled()) {
-      $enabledTypes = CRM_Civigiftaid_Form_Admin::getFinancialTypesEnabled();
-      $enabledTypesStr = implode(', ', $enabledTypes);
-
-      // if no financial types are selected, don't return anything from query
-      $query .= $enabledTypesStr
-        ? " AND i.financial_type_id IN ({$enabledTypesStr})"
-        : " AND 0";
-    }
-
-    $dao = CRM_Core_DAO::executeQuery($query);
-    while ($dao->fetch()) {
-      if (isset($result[$dao->id])) {
-        $item = static::getLineItemName($dao->entity_table);
-
-        $lineItem = array(
-          'item'           => $item,
-          'description'    => $dao->label,
-          'financial_type' => $dao->name,
-          'amount'         => CRM_Utils_Money::format(
-            $dao->line_total, $dao->currency
-          ),
-          'qty'            => (int) $dao->qty,
-        );
-        $result[$dao->id]['line_items'][] = $lineItem;
+    if (!\Civi::settings()->get('civigiftaid_globally_enabled')) {
+      $enabledTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
+      if (empty($enabledTypes)) {
+        // if no financial types are selected
+        return $contributionDetails;
       }
+      $query .= " AND financial_type_id IN (%2)";
+      $queryParams[2] = [implode(', ', $enabledTypes), 'CommaSeparatedIntegers'];
     }
-  }
 
-  public static function getGiftAidableAmtByContribId() {
-
+    $query .= " GROUP BY i.contribution_id";
+    $dao = CRM_Core_DAO::executeQuery($query, $queryParams);
+    while ($dao->fetch()) {
+      $contributionDetails[$dao->contribution_id]['line_items_count'] = $dao->line_item_count;
+    }
+    return $contributionDetails;
   }
 
   /**
    * @param float|int $contributionAmt
-   * @param int       $contributionID
+   * @param int $contributionID
    *
    * @return float|int
    */
-  private static function getGiftAidableContribAmt(
-    $contributionAmt,
-    $contributionID
-  ) {
-    return CRM_Civigiftaid_Form_Admin::isGloballyEnabled()
-      ? $contributionAmt
-      : static::getContribAmtForEnabledFinanceTypes($contributionID);
+  private static function getGiftAidableContribAmt($contributionAmt, $contributionID) {
+    if (\Civi::settings()->get('civigiftaid_globally_enabled')) {
+      return $contributionAmt;
+    }
+    return self::getContribAmtForEnabledFinanceTypes($contributionID);
   }
 
   /**
-   * Get all contribution Ids that are already in giftaid batch.
+   * @param array $contribution
    *
-   * @param array $contributionIDs
-   *  Array of contribution Ids.
-   * @return array
-   *  Array of contributions Ids that are already in batch.
+   * @return bool
+   * @throws \CiviCRM_API3_Exception
    */
-  private static function getContributionsInBatch(array $contributionIDs) {
-    $contributions = civicrm_api3('EntityBatch', 'get', [
-        'return' => ['entity_id'],
-        'entity_table' => 'civicrm_contribution',
-        'batch_id.type_id' => "giftaid_batch",
-        'entity_id' => [ 'IN' => (array) $contributionIDs],
-    ]);
+  public static function isEligibleForGiftAid($contribution) {
+    $isContributionEligible = self::isContributionEligible($contribution);
 
-    $contributionsInBatch = [];
-    if (!empty($contributions['values'])) {
-      $contributionsInBatch = array_column($contributions['values'], 'entity_id');
+    // hook can alter the eligibility if needed
+    CRM_Civigiftaid_Utils_Hook::giftAidEligible($isContributionEligible, $contribution['contact_id'], $contribution['receive_date'], $contribution['id']);
+    return $isContributionEligible;
+  }
+
+  /**
+   * @param array $declarations
+   * @param int $limit
+   *
+   * @return array
+   * @throws \CiviCRM_API3_Exception
+   */
+  public static function getContributionsByDeclarations($declarations = [], $limit = 100) {
+    $contributionsToSubmit = [];
+
+    foreach ($declarations as $declaration) {
+      $dateRange = [];
+
+      $contactId = $declaration['entity_id'];
+      $startDate = $declaration['start_date'];
+      $dateRange[0] = self::dateFourYearsAgo($startDate);
+      $dateRange[1] = $startDate;
+      $contributions = self::getContributionsByDateRange($contactId, $dateRange);
+      $contributionsToSubmit = array_merge($contributions, $contributionsToSubmit);
+
+      if (count($contributionsToSubmit) >= $limit) {
+        $contributionsToSubmit = array_slice($contributionsToSubmit, 0, $limit);
+        break;
+      }
+    }
+    return $contributionsToSubmit;
+  }
+
+  /**
+   * @param int $contactId
+   * @param array $dateRange
+   *
+   * @return mixed
+   * @throws \CiviCRM_API3_Exception
+   */
+  public static function getContributionsByDateRange($contactId, $dateRange) {
+    if (\Civi::settings()->get('civigiftaid_globally_enabled')) {
+      $result = civicrm_api3('Contribution', 'get', [
+        'sequential' => 1,
+        'return' => "financial_type_id,id",
+        'contact_id' => $contactId,
+        'id' => ['NOT IN' => self::submittedContributions()],
+        'receive_date' => ['BETWEEN' => $dateRange],
+      ]);
+    }
+    else {
+      if ($financialTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled')) {
+        $result = civicrm_api3('Contribution', 'get', [
+          'sequential' => 1,
+          'return' => "financial_type_id,id",
+          'contact_id' => $contactId,
+          'financial_type_id' => $financialTypes,
+          'id' => ['NOT IN' => self::submittedContributions()],
+          'receive_date' => ['BETWEEN' => $dateRange],
+        ]);
+      }
+    }
+    return $result['values'];
+  }
+
+  /**
+   * @return array
+   */
+  public static function submittedContributions() {
+    $submittedContributions = [];
+    $sql = "
+        SELECT entity_id
+        FROM   civicrm_value_gift_aid_submission";
+
+    $dao = CRM_Core_DAO::executeQuery($sql);
+    foreach ($dao->fetchAll() as $row) {
+      $submittedContributions[] = $row['entity_id'];
     }
 
-    return $contributionsInBatch;
+    return $submittedContributions;
   }
+
+  /**
+   * @param array $contribution
+   *
+   * @return array|NULL
+   * @throws \Exception
+   */
+  public static function getDeclarationForContribution(array $contribution) {
+    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contribution['contact_id']);
+    if (empty($declarations)) {
+      return NULL;
+    }
+
+    // If contribution is marked as not eligible for gift-aid it is not eligible..
+    if (!(bool) $contribution['gift_aid.eligible_for_gift_aid']) {
+      // Contribution marked as not eligible
+      return NULL;
+    }
+
+    $eligibleAmount = $contribution['gift_aid.amount'];
+    if (!empty($eligibleAmount) && ($eligibleAmount == 0)) {
+      // Contribution has 0 eligible amount.
+      return NULL;
+    }
+
+    foreach ($declarations as $declaration) {
+      if ($declaration['eligible_for_gift_aid'] === CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS) {
+        $declaration['start_date'] = self::dateFourYearsAgo($declaration['start_date']);
+      }
+
+      // Convert dates to timestamps.
+      $startDateTS = strtotime(date('Ymd 00:00:00', strtotime($declaration['start_date'])));
+      $endDateTS = !empty($declaration['end_date']) ? strtotime(date('Ymd 00:00:00', strtotime($declaration['end_date']))) : NULL;
+      $contributionDateTS = strtotime($contribution['receive_date']);
+
+      /**
+       * Check between which date the contribution's receive date falls.
+       */
+      if (!empty($endDateTS)) {
+        $contributionDeclarationDateMatchFound =
+          ($contributionDateTS >= $startDateTS) && ($contributionDateTS < $endDateTS);
+      }
+      else {
+        $contributionDeclarationDateMatchFound = ($contributionDateTS >= $startDateTS);
+      }
+
+      if ($contributionDeclarationDateMatchFound === TRUE) {
+        return $declaration;
+      }
+    }
+    return NULL;
+  }
+
+  /**
+   * Check if Eligibility criteria for Contribution is met.
+   *
+   * @param array $contribution
+   *
+   * @return bool
+   */
+  public static function isContributionEligible(array $contribution): bool {
+    $declaration = self::getDeclarationForContribution($contribution);
+    if ($declaration) {
+      return (bool) $declaration['eligible_for_gift_aid'];
+    }
+    return FALSE;
+  }
+
+  /**
+   * @param string $startDate
+   *
+   * @return string
+   * @throws \Exception
+   */
+  public static function dateFourYearsAgo($startDate) {
+    $date = new DateTime($startDate);
+    $dateFourYearsAgo = $date->modify('-4 year')->format('Y-m-d H:i:s');
+    return $dateFourYearsAgo;
+  }
+
 }

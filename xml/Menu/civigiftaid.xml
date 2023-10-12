@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <menu>
   <item>
-    <path>civicrm/admin/gift-aid</path>
-    <page_callback>CRM_Civigiftaid_Form_Admin</page_callback>
-    <title>Admin</title>
-    <access_arguments>access CiviCRM</access_arguments>
+    <path>civicrm/admin/setting/ukgiftaid</path>
+    <title>Gift Aid settings</title>
+    <page_callback>CRM_Admin_Form_Generic</page_callback>
+    <access_arguments>administer CiviCRM</access_arguments>
   </item>
 </menu>

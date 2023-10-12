@@ -1,0 +1,30 @@
+site_name: UK Gift Aid
+repo_url: https://lab.civicrm.org/extensions/ukgiftaid
+
+theme:
+  name: material
+markdown_extensions:
+  - attr_list
+  - admonition
+  - def_list
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tilde
+  - pymdownx.betterem
+  - pymdownx.mark
+
+nav:
+- "Release Notes": releasenotes.md
+- "Introduction": index.md
+- "Setup and Configuration": setup.md
+- "The Gift Aid Declaration": declaration.md
+- "Contributions and Eligibility": contributions.md
+- "Creating and managing your batch": batches.md
+- "Submitting to HMRC / Reporting": submission.md
+- "Managing the basic rate of Tax": tax.md
+- "API Functions": api.md
+- "Reference": reference/index.md
+

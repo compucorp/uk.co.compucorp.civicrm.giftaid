@@ -1,1 +1,1 @@
-<xi:include href="CRM/BatchSettings/files.xml"         parse="xml" />
+<xi:include href="CRM/Civigiftaid/files.xml"         parse="xml" />

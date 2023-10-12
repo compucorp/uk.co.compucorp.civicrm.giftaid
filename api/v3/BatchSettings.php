@@ -1,16 +1,13 @@
 <?php
-
-/**
- * BatchSettings.create API specification (optional)
- * This is used for documentation and validation.
- *
- * @param array $spec description of fields supported by this API call
- * @return void
- * @see http://wiki.civicrm.org/confluence/display/CRM/API+Architecture+Standards
+/*
+ +--------------------------------------------------------------------+
+ | Copyright CiviCRM LLC. All rights reserved.                        |
+ |                                                                    |
+ | This work is published under the GNU AGPLv3 license with some      |
+ | permitted exceptions and without any warranty. For full license    |
+ | and copyright information, see https://civicrm.org/licensing       |
+ +--------------------------------------------------------------------+
  */
-function _civicrm_api3_batch_settings_create_spec(&$spec) {
-  // $spec['some_parameter']['api.required'] = 1;
-}
 
 /**
  * BatchSettings.create API

@@ -1,7 +1,20 @@
 <?php
+/*
+ +--------------------------------------------------------------------+
+ | Copyright CiviCRM LLC. All rights reserved.                        |
+ |                                                                    |
+ | This work is published under the GNU AGPLv3 license with some      |
+ | permitted exceptions and without any warranty. For full license    |
+ | and copyright information, see https://civicrm.org/licensing       |
+ +--------------------------------------------------------------------+
+ */
+
+use Civi\Api4\CustomField;
+use Civi\Api4\CustomGroup;
+use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
- * Collection of upgrade steps
+ * Collection of upgrade steps.
  */
 class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
@@ -11,128 +24,446 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   // By convention, functions that look like "function upgrade_NNNN()" are
   // upgrade tasks. They are executed in order (like Drupal's hook_update_N).
 
+  /** @var int */
+  public $declarationCustomGroupID;
+
+  /** @var int */
+  public $contributionGiftaidCustomGroupId;
+
+
+  /** @var array */
+  public $optionGroupNameToId = [];
+
+  /** @var array */
+  public $customFieldNamesToIds = [];
+
   /**
-   * Example: Run an external SQL script when the module is installed
-   *
    */
   public function install() {
-    //only for vesion 1.0 to 2.1
-    //To remove the future
-    self::removeLegacyRegisteredReport();
-    self::migrateOneToTwo($this);
-    //end step for upgrading version 1.0 t0 2.1
+    $this->ensureDataStructures();
+    // Nb. this is kept to preserve previous behaviour, it should not be needed.
+    // Import existing batches.
+    self::importBatches();
+    // In case this extension had been installed and uninstalled before:
+    $this->removeLegacyRegisteredReport();
+  }
 
-    $ogId = self::getReportTemplateGroupId();
-    if($ogId){
-      $className = self::REPORT_CLASS;
-      $reportUrl = new CRM_Core_DAO_OptionValue();
-      $reportUrl->option_group_id = $ogId;
-      $reportUrl->value = self::REPORT_URL;
-      $dupeURL = $dupeClass = FALSE;
-      if ($reportUrl->find(TRUE)) {
-        //if url exist
-        $dupeURL = TRUE;
-        if ($reportUrl->name == $className) {
-          $dupeClass = TRUE;
+  public function postInstall() {
+    $this->createReportInstance();
+    return TRUE;
+  }
+
+  /**
+   * Safely repeatable function to ensure all the data structures we need
+   * exist.
+   */
+  public function ensureDataStructures() {
+    // Note most of these depend on the others having been called during
+    // runtime, so the order is important.
+    $this->setOptionGroups();
+    $this->enableOptionGroups(1);
+    $this->ensureCustomGroups();
+    $this->ensureCustomFields();
+    $this->setDefaultSettings();
+    $this->ensureProfiles();
+  }
+  /**
+   * Ensure we have the custom groups defined.
+   *
+   *
+   */
+  protected function ensureCustomGroups() {
+    $this->declarationCustomGroupID = $this->findOrCreate('CustomGroup',
+      ['name' => 'gift_aid_declaration'],
+      [
+        'is_active' => 1,
+        'extends'   => 'Individual',
+      ],
+      [
+        'title'                => 'Gift Aid Declaration',
+        'table_name'           => 'civicrm_value_gift_aid_declaration',
+        'is_multiple'          => 1,
+        'style'                => 'Tab',
+        'collapse_display'     => 0,
+        'collapse_adv_display' => 0,
+        'weight'               => 1,
+      ]
+    )['id'];
+
+    $this->contributionGiftaidCustomGroupId = $this->findOrCreate('CustomGroup',
+      ['name' => 'gift_aid'],
+      [
+        'is_active' => 1,
+        'extends'   => 'Contribution',
+      ],
+      [
+        'title'                => 'Gift Aid',
+        'style'                => 'Inline',
+        'collapse_display'     => 0,
+        'help_pre'             => 'Stores the Gift Aid values for contributions',
+        'table_name'           => 'civicrm_value_gift_aid_submission',
+        'is_multiple'          => 0,
+        'collapse_adv_display' => 0,
+        'weight'               => 2,
+      ]
+    )['id'];
+  }
+  /**
+   * Ensure we have the custom fields defined for declaration
+   *
+   * Note: requires ensureCustomGroups() to have run.
+   */
+  protected function ensureCustomFields() {
+    foreach ($this->getCustomFields() as $name => $details) {
+
+      $findParams =  array_intersect_key($details, array_flip([
+        'name', 'custom_group_id']));
+
+      // Which param are required, i.e. if they are not these params, the
+      // existing data will be re-set to them.
+      if (!empty($details['_requiredParams'])) {
+        // This field has specified its own.
+        $requiredParams = $details['_requiredParams'];
+      }
+      else {
+        // Typical case, insist on these:
+        $requiredParams = array_intersect_key($details, array_flip([
+          'default_value', 'is_active', 'is_searchable', 'weight', 'help_pre',
+          'help_post', 'is_search_range', 'text_length', 'data_type', 'html_type',
+          'option_group_id',
+        ] ));
+      }
+      unset($details['_requiredParams']);
+
+      $additionalCreateParams = $details;
+
+      // Ensure field exists.
+      // Note: we store its ID so we can look it up easily later.
+      // We cannot simply store the name though because sadly we have used
+      // eligible_for_gift_aid as a custom field name twice in two different
+      // custom groups. Doh.
+      $this->customFieldNamesToIds["$details[custom_group_id]--$details[name]"] = $this->findOrCreate('CustomField', $findParams, $requiredParams, $additionalCreateParams)['id'];
+    }
+  }
+
+  /**
+   */
+  protected function ensureProfiles() {
+    $profileId = $this->findOrCreate('UFGroup',
+      ['name' => 'gift_aid'],
+      [
+        'is_active' => 1,
+        'group_type' => 'Individual,Contact',
+      ],
+      [
+        'title' => 'Gift Aid',
+        'add_captcha' => 0,
+        'is_map' => 0,
+        'is_edit_link' => 0,
+        'is_uf_link' => 0,
+        'is_update_dupe' => 2,
+        'is_proximity_search' => 0,
+      ]
+    )['id'];
+
+    $this->findOrCreate('UFField',
+      [
+        'uf_group_id' => $profileId,
+        'field_name' => 'custom_' . $this->customFieldNamesToIds["{$this->declarationCustomGroupID}--eligible_for_gift_aid"],
+      ],
+      [
+        'is_active' => 1,
+        'is_view' => 0,
+        'is_required' => 1,
+        'help_post' => '<p>By selecting \'Yes\' above you are confirming that
+<ol>
+<li>You are a UK taxpayer</li>
+<li>The amount of income and/or capital gains tax you pay is at least as much as we will reclaim on your donations in this tax year</li>
+</ol>
+<p><b>About Gift Aid</b><p>
+<p>Gift Aid increases the value of membership contributions and donations to charities by allowing them to reclaim basic rate tax on your gift. It allows us to claim 25% on top of your donation, for example, on a £50 membership or donation, we can claim back an additional £12.50.</p>
+<p>We would like to reclaim gift aid on your behalf. We can only reclaim Gift Aid if you are a UK taxpayer. Please confirm that you are eligible for Gift Aid. <a href="http://www.hmrc.gov.uk/individuals/giving/gift-aid.htm">More about Gift Aid</a>.</p>',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => 1,
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'Can we reclaim gift aid on your donation?',
+        'field_type' => 'Individual',
+      ]);
+
+    $this->findOrCreate('UFField',
+      [
+        'field_name' => 'first_name',
+        'uf_group_id' => $profileId,
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'is_required' => '1',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '2',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'First Name',
+        'field_type' => 'Individual',
+      ]);
+
+    $this->findOrCreate('UFField',
+      [
+        'field_name' => 'last_name',
+        'uf_group_id' => $profileId,
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'is_required' => '1',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '3',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'Last Name',
+        'field_type' => 'Individual',
+      ]
+    );
+
+    $this->findOrCreate('UFField',
+      [
+        'field_name' => 'street_address',
+        'uf_group_id' => $profileId,
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'location_type_id' => '1',
+        'is_required' => '1',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '4',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'Street Address',
+        'field_type' => 'Contact',
+      ]);
+
+
+    $this->findOrCreate('UFField',
+      [
+        'field_name' => 'supplemental_address_1',
+        'uf_group_id' => $profileId,
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'location_type_id' => '1',
+        'is_required' => '0',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '5',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'Supplemental Address 1',
+        'field_type' => 'Contact',
+      ]);
+
+    $this->findOrCreate('UFField',
+      [
+        'uf_group_id' => $profileId,
+        'field_name' => 'supplemental_address_2',
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'location_type_id' => '1',
+        'is_required' => '0',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '6',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'Supplemental Address 2',
+        'field_type' => 'Contact',
+      ]);
+
+    $this->findOrCreate('UFField',
+      [
+        'uf_group_id' => $profileId,
+        'field_name' => 'city',
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'location_type_id' => '1',
+        'is_required' => '0',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '7',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'City',
+        'field_type' => 'Contact',
+      ]);
+
+    $this->findOrCreate('UFField',
+      [
+        'uf_group_id' => $profileId,
+        'field_name' => 'state_province',
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'location_type_id' => '1',
+        'is_required' => '0',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '8',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'County',
+        'field_type' => 'Contact',
+      ]);
+
+    $this->findOrCreate('UFField',
+      [
+        'uf_group_id' => $profileId,
+        'field_name' => 'postal_code',
+      ],
+      [
+        'is_active' => '1',
+        'is_view' => '0',
+        'location_type_id' => '1',
+        'is_required' => '1',
+        'visibility' => 'User and User Admin Only',
+      ],
+      [
+        'weight' => '9',
+        'help_post' => '',
+        'in_selector' => '0',
+        'is_searchable' => '0',
+        'label' => 'Post code',
+        'field_type' => 'Contact',
+      ]);
+  }
+
+  /**
+   * Check we have the thing we need.
+   *
+   * When creating an entity $findParams + $requiredParams + $additionalCreateParams is used
+   *
+   * @param string $entity
+   * @param array $findParams
+   *   API params used to find if the thing we want exists. e.g. ['name' => 'my_name']
+   * @param array $requiredParams
+   *   If these values are incorrect in a found entity, they will be corrected.
+   * @param array $additionalCreateParams
+   *   These values will only be used if creating an entity.
+   *
+   * @return array
+   *   The entity, as returned by a 'get' action (which can sometimes differ from the result of a create action.)
+   */
+  protected function findOrCreate($entity, $findParams, $requiredParams = [], $additionalCreateParams = []) {
+    try {
+      $result = civicrm_api3($entity, 'get', $findParams);
+      $found = $result['count'];
+      if ($found == 0) {
+        // Not found, create now.
+        $result = civicrm_api3($entity, 'create', $findParams + $requiredParams + $additionalCreateParams);
+        return civicrm_api3($entity, 'getsingle', ['id' => $result['id']]);
+      }
+      elseif ($found == 1) {
+        // Take the first (only) item, but check for requiredParams.
+        $thing = current($result['values']);
+        $corrections = [];
+        foreach ($requiredParams as $k => $v) {
+          if (($thing[$k] ?? NULL) != $v) {
+            $corrections[$k] = $v;
+          }
+        }
+        if ($corrections) {
+          // Need to correct it/update it.
+          $corrections['id'] = $thing['id'];
+          civicrm_api3($entity, 'create', $corrections);
+          // Reload
+          return civicrm_api3($entity, 'getsingle', ['id' => $thing['id']]);
+        }
+        else {
+          // Wanted one, found it, no corrections.
+          return $thing;
         }
       }
-      if (!$dupeClass) {
-        $reportClass = new CRM_Core_DAO_OptionValue();
-        $reportClass->option_group_id = $ogId;
-        $reportClass->name = $className;
-        if ($reportClass->find(TRUE)) {
-          $dupeClass = TRUE;
-        }
-      }
-
-      if (!$dupeClass && !$dupeURL) {
-        $params = array(
-          'version' => 3,
-          'option_group_id' => $ogId,
-          'label' => 'Gift Aid Report',
-          'name' => self::REPORT_CLASS,
-          'value' => 'civicrm/contribute/uk-giftaid',
-          'description' => 'For submitting Gift Aid reports to HMRC treasury.',
-          'component_id' => CRM_Core_DAO::getFieldValue('CRM_Core_DAO_Component',
-            'CRM_Contribute',
-            'id',
-            'namespace'
-          ),
-          'is_active' => 1
-        );
-        $result = civicrm_api('OptionValue', 'create', $params);
+      else {
+        // Huh, we found more than one?
+        throw new \Exception("Cannot install '$entity', expected 0 or 1 matching "
+        . json_encode($findParams) . " but found $found");
       }
     }
+    catch (\Exception $e) {
+      Civi::log()->error("FAILED ON: " .json_encode([$entity, $findParams, $requiredParams, $additionalCreateParams]));
+      throw $e;
+    }
+  }
 
-    $this->upgrade_3000();
-    $this->upgrade_3101();
-    $this->upgrade_3103();
+  private function createReportInstance() {
+    // Now see if we have a report and create one if we don't
+    try {
+      $reportID = CRM_Core_DAO::singleValueQuery(
+        "SELECT id FROM `civicrm_report_instance` WHERE report_id='" . CRM_Civigiftaid_Upgrader::REPORT_URL . "'"
+      );
+    }
+    catch (Exception $e) {
+      $reportID = NULL;
+    }
+
+    if (!$reportID) {
+      try {
+        $reportTemplate = civicrm_api3('ReportTemplate', 'getsingle', [
+          'value' => CRM_Civigiftaid_Upgrader::REPORT_URL,
+        ]);
+        civicrm_api3('ReportInstance', 'create', [
+          'title' => $reportTemplate['label'],
+          'report_id' => $reportTemplate['value'],
+          'description' => $reportTemplate['description'],
+          'permission' => 'access CiviReport',
+        ]);
+      }
+      catch (Exception $e) {
+        \Civi::log()->error('Failed to create GiftAid report instance. ' . $e->getMessage());
+      }
+    }
   }
 
   /**
    * Example: Run an external SQL script when the module is uninstalled
-   *
    */
   public function uninstall() {
-
-    $reportUrl = new CRM_Core_DAO_OptionValue();
-    $reportUrl->option_group_id = self::getReportTemplateGroupId();;
-    $reportUrl->value = self::REPORT_URL;
-    if ($reportUrl->find(TRUE)) {
-      if ($reportUrl->name == $className) {
-        $reportUrl->delete();
-      }
-    }
-
-    $reportClass = new CRM_Core_DAO_OptionValue();
-    $reportClass->option_group_id = self::getReportTemplateGroupId();;
-    $reportClass->name = self::REPORT_CLASS;
-    if ($reportClass->find(TRUE)) {
-      $reportClass->delete();
-    }
-
     $this->unsetSettings();
   }
 
   /**
    * Example: Run a simple query when a module is enabled
-   *
-  */
+   */
   public function enable() {
-
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = 1  WHERE name = 'giftaid_batch_name'");
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = 1  WHERE name = 'giftaid_basic_rate_tax'");
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = 1  WHERE name = 'reason_ended'");
-
-    civicrm_api('CustomGroup', 'update', array(
-      'version' => 3,
-      'is_active' => 1,
-      'id' => CRM_Utils_Array::value('id',civicrm_api('CustomGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'Gift_Aid')
-      )),
-    ));
-
-    civicrm_api('CustomGroup', 'update', array(
-      'version' => 3,
-      'is_active' => 1,
-      'id' =>  CRM_Utils_Array::value('id',civicrm_api('CustomGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'Gift_Aid_Declaration')
-      )),
-    ));
-
-    civicrm_api('UFGroup', 'update', array(
-      'version' => 3,
-      'is_active' => 1,
-      'id' =>  CRM_Utils_Array::value('id',civicrm_api('UFGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'Gift_Aid_Declaration')
-      )),
-    ));
-    $gid = self::getReportTemplateGroupId();
-    $className = self::REPORT_CLASS;
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_value SET is_active = 1 WHERE option_group_id = $gid AND name = '$className'");
+    $this->setOptionGroups();
+    $this->enableOptionGroups(1);
+    $this->ensureCustomGroups();
+    $this->ensureCustomFields();
   }
 
   /**
@@ -140,49 +471,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
    *
    */
   public function disable() {
-
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = 0 WHERE name = 'giftaid_batch_name'");
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = 0 WHERE name = 'giftaid_basic_rate_tax'");
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = 0 WHERE name = 'reason_ended'");
-
-     civicrm_api('CustomGroup', 'update', array(
-      'version' => 3,
-      'is_active' => 0,
-      'id' => CRM_Utils_Array::value('id',civicrm_api('CustomGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'Gift_Aid')
-      )),
-    ));
-
-    civicrm_api('CustomGroup', 'update', array(
-      'version' => 3,
-      'is_active' => 0,
-      'id' =>  CRM_Utils_Array::value('id',civicrm_api('CustomGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'Gift_Aid_Declaration')
-      )),
-    ));
-
-    civicrm_api('UFGroup', 'update', array(
-      'version' => 3,
-      'is_active' => 0,
-      'id' =>  CRM_Utils_Array::value('id',civicrm_api('UFGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'Gift_Aid_Declaration')
-      )),
-    ));
-    $gid = self::getReportTemplateGroupId();
-    $className = self::REPORT_CLASS;
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_value SET is_active = 0 WHERE option_group_id = $gid AND name = '$className'");
-
-    /*
-    civicrm_api('OptionValue', 'update', array(
-      'version' => 3,
-      'is_active' => 0,
-      'name' => self::REPORT_CLASS,
-      'option_group_id' => self::getReportTemplateGroupId()
-    ));*/
-
+    $this->enableOptionGroups(0);
   }
 
   /**
@@ -212,36 +501,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     $this->executeSqlFile('sql/upgrade_3000.sql');
 
     // Import existing batches.
-    static::importBatches();
-
-    return TRUE;
-  }
-
-  /*
-   * Set up Past Year Submissions Job
-   */
-  public function upgrade_3101()
-  {
-    $this->log('Applying update 3101');
-
-    // create scheduled job
-    $dao = new CRM_Core_DAO_Job();
-    $dao->api_entity = 'gift_aid';
-    $dao->api_action = 'makepastyearsubmissions';
-    $dao->find(TRUE);
-    if (!$dao->id)
-    {
-      $dao = new CRM_Core_DAO_Job();
-      $dao->domain_id = CRM_Core_Config::domainID();
-      $dao->run_frequency = 'Daily';
-      $dao->parameters = null;
-      $dao->name = 'Make Past Year Submissions';
-      $dao->description = 'Make Past Year Submissions';
-      $dao->api_entity = 'gift_aid';
-      $dao->api_action = 'makepastyearsubmissions';
-      $dao->is_active = 0;
-      $dao->save();
-    }
+    self::importBatches();
 
     return TRUE;
   }
@@ -254,196 +514,796 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     CRM_Core_DAO::executeQuery("ALTER TABLE civicrm_value_gift_aid_submission MODIFY COLUMN eligible_for_gift_aid int");
 
     // Update custom field type from String to Int
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_custom_field SET data_type = 'Int' WHERE name = 'Eligible_for_Gift_Aid'");
+    CRM_Core_DAO::executeQuery("UPDATE civicrm_custom_field SET data_type = 'Int' WHERE name = 'eligible_for_gift_aid'");
 
+    return TRUE;
+  }
 
-    // Add new option groups and options
-    $og1Id = CRM_Core_BAO_OptionGroup::ensureOptionGroupExists(
-      [
-        'name' => 'eligibility_declaration_options',
-        'title' => 'Eligibility Declaration Options',
-        'label' => 'Eligibility Declaration Options',
-        'is_active' => 1,
-        'is_reserved' => 1,
-      ]
-    );
-    $og2Id = CRM_Core_BAO_OptionGroup::ensureOptionGroupExists(
-      [
-        'name' => 'uk_taxpayer_options',
-        'title' => 'UK Taxpayer Options',
-        'label' => 'UK Taxpayer Options',
-        'is_active' => 1,
-        'is_reserved' => 1
-      ]
-    );
+  public function upgrade_3103() {
+    $this->log('Applying update 3103 - delete old report templates');
+    $this->removeLegacyRegisteredReport();
+    return TRUE;
+  }
 
-    $optionValues = array (
-      array (
-        'sequential' => 1,
-        'option_group_id' => $og1Id,
-        'label' => 'Yes',
-        'value' => 1,
-        'name' => 'eligible_for_giftaid',
-      ),
-      array (
-        'sequential' => 1,
-        'option_group_id' => $og1Id,
-        'label' => 'No',
-        'value' => 0,
-        'name' => 'not_eligible_for_giftaid',
-      ),
-      array (
-        'sequential' => 1,
-        'option_group_id' => $og1Id,
-        'label' => 'Yes, in the Past 4 Years',
-        'value' => 3,
-        'name' => 'past_four_years',
-      ),
-      array (
-        'sequential' => 1,
-        'option_group_id' => $og2Id,
-        'label' => 'Yes',
-        'value' => 1,
-        'name' => 'yes_uk_taxpayer',
-      ),
-      array (
-        'sequential' => 1,
-        'option_group_id' => $og2Id,
-        'label' => 'No',
-        'value' => 0,
-        'name' => 'not_uk_taxpayer',
-      ),
-      array (
-        'sequential' => 1,
-        'option_group_id' => $og2Id,
-        'label' => 'Yes, in the Past 4 Years',
-        'value' => 3,
+  public function upgrade_3104() {
+    $this->log('Applying update 3104 - change profile(s) to use Individual declaration eligibility field instead of contribution eligibility field');
+    $contributionGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid');
+    $contactGiftAidField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration');
+    $helpPost = '<p>By selecting &#039;Yes&#039; above you are confirming that you are a UK taxpayer and the amount of income and/or capital gains tax you pay is at least as much as we will reclaim on your donations in this tax year.</p>
+<p><b>About Gift Aid</b></p>
+<p>Gift Aid increases the value of donations to charities by allowing them to reclaim basic rate tax on your gift.  We would like to reclaim gift aid on your behalf.  We can only reclaim Gift Aid if you are a UK taxpayer.  Please confirm that you are a eligible for gift aid above.  <a href="http://www.hmrc.gov.uk/individuals/giving/gift-aid.htm">More about Gift Aid</a>.</p>';
+
+    $query = "UPDATE civicrm_uf_field SET field_name='{$contactGiftAidField}', field_type='Individual', help_post='{$helpPost}' WHERE field_name='{$contributionGiftAidField}'";
+    CRM_Core_DAO::executeQuery($query);
+
+    $this->log('Applying update 3104 - checking optiongroups');
+    $this->setOptionGroups();
+
+    return TRUE;
+  }
+
+  public function upgrade_3107() {
+    $this->log('Updating custom fields');
+    $this->ensureCustomGroups();
+    $this->ensureCustomFields();
+    return TRUE;
+  }
+
+  /**
+   * There's the chance of ambiguity on the default value of batch_name,
+   * which should be NULL. This was causing tests to fail on new installs
+   * and historically a lot has changed around this so better to make sure
+   * the default is applied here too.
+   *
+   * @see https://github.com/mattwire/uk.co.compucorp.civicrm.giftaid/pull/18
+   * @see comment in install()
+   */
+  public function upgrade_3108() {
+    $this->log('Updating default batch_name');
+    $this->executeSqlFile('sql/reset_batch_name_default.sql');
+    return TRUE;
+  }
+
+  public function upgrade_3109() {
+    $this->log('Disable "Yes, in the past 4 years" for contributions if it exists');
+    try {
+      $optionValueParams = [
+        'option_group_id' => 'uk_taxpayer_options',
         'name' => 'uk_taxpayer_past_four_years',
-      ),
-    );
+      ];
+      $optionValue = civicrm_api3('OptionValue', 'getsingle', $optionValueParams);
+      $optionValueParams['id'] = $optionValue['id'];
+      if (empty($optionValue['is_active'])) {
+        $optionValueParams['is_active'] = 0;
+        civicrm_api3('OptionValue', 'create', $optionValueParams);
+      }
+    }
+    catch(Exception $e) {
+      // Ok, it doesn't exist. Good.
+    }
+    return TRUE;
+  }
 
-    foreach($optionValues as $params) {
-      CRM_Core_BAO_OptionValue::ensureOptionValueExists($params);
+  /**
+   * Add given date.
+   *
+   */
+  public function upgrade_3110() {
+    $this->log('Add given date field.');
+    $this->ensureCustomGroups();
+    $this->ensureCustomFields();
+    // Update any records missing a given date.
+    $sql = "UPDATE civicrm_value_gift_aid_declaration
+      SET given_date = start_date
+      WHERE given_date IS NULL";
+
+    CRM_Core_DAO::executeQuery($sql);
+
+    return TRUE;
+  }
+
+  public function upgrade_3112() {
+    $this->log('Check we have batch_type = "Gift Aid" and fix profile setup');
+    $this->ensureDataStructures();
+     \Civi\Api4\System::flush()
+       ->setCheckPermissions(FALSE)
+       ->setSession(TRUE)
+       ->setTriggers(TRUE);
+    return TRUE;
+  }
+
+  public function upgrade_3113() {
+    $this->log('Extend source field length to match contribution page');
+    $this->ensureDataStructures();
+    return TRUE;
+  }
+
+  public function upgrade_3114() {
+    $this->log('Check and update data_type for custom fields');
+    $this->ensureDataStructures();
+    return TRUE;
+  }
+
+  public function upgrade_3115() {
+    $this->log('Check and create GiftAid report instance');
+    $this->createReportInstance();
+    $this->log('Fix searching by GiftAid batch');
+    $this->ensureDataStructures();
+    return TRUE;
+  }
+
+  public function upgrade_3116() {
+    $this->log('Remove GiftAid.Makepastyearsubmissions scheduled job');
+    $jobsToDelete = civicrm_api3('Job', 'get', [
+      'api_entity' => "gift_aid",
+      'api_action' => "makepastyearsubmissions",
+    ]);
+    if ($jobsToDelete['count'] > 0) {
+      foreach ($jobsToDelete['values'] as $jobID => $jobDetail) {
+        civicrm_api3('Job', 'delete', [
+          'id' => $jobID,
+        ]);
+      }
+    }
+    return TRUE;
+  }
+
+  public function upgrade_3117() {
+    $this->log('Add/update entity_batch_extends optionGroup and add civicrm_contribution optionValue (required for CiviCRM 5.44+)');
+    $this->setOptionGroups();
+    return TRUE;
+  }
+
+  public function upgrade_3118() {
+    $this->log('Changing customfield names to lowercase');
+
+    // Note: CustomGroup::update doesn't seem to work to change the case
+    $giftAidCustomGroups = [
+      'gift_aid_declaration' => 'civicrm_value_gift_aid_declaration',
+      'gift_aid' => 'civicrm_value_gift_aid_submission',
+    ];
+    $sql = "UPDATE civicrm_custom_group SET `name`=%1 WHERE `table_name`=%2";
+    foreach ($giftAidCustomGroups as $name => $tableName) {
+      CRM_Core_DAO::executeQuery($sql, [1 => [$name, 'String'], 2 => [$tableName, 'String']]);
     }
 
-    $declarationCustomGroupID = CRM_Utils_Array::value('id',civicrm_api('CustomGroup', 'getsingle', array(
-      'version' => 3,
-      'name' => 'Gift_Aid_Declaration')
-    ));
-
-    $submissionCustomGroupId = CRM_Utils_Array::value('id',civicrm_api('CustomGroup', 'getsingle', array(
-      'version' => 3,
-      'name' => 'Gift_Aid')
-    ));
-
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_custom_field SET option_group_id = {$og1Id} WHERE name = 'Eligible_for_Gift_Aid' AND custom_group_id = {$declarationCustomGroupID}");
-    CRM_Core_DAO::executeQuery("UPDATE civicrm_custom_field SET option_group_id = {$og2Id} WHERE name = 'Eligible_for_Gift_Aid' AND custom_group_id = {$submissionCustomGroupId}");
+    $giftAidDeclarationFields = [
+      'eligible_for_gift_aid' => 'eligible_for_gift_aid',
+      'address' => 'address',
+      'post_code' => 'post_code',
+      'given_date' => 'given_date',
+      'start_date' => 'start_date',
+      'end_date' => 'end_date',
+      'reason_ended' => 'reason_ended',
+      'source' => 'source',
+      'notes' => 'notes',
+      'scanned_declaration' => 'scanned_declaration',
+    ];
+    $giftAidContributionFields = [
+      'eligible_for_gift_aid' => 'eligible_for_gift_aid',
+      'amount' => 'amount',
+      'gift_aid_amount' => 'gift_aid_amount',
+      'batch_name' => 'batch_name',
+    ];
+    foreach ($giftAidDeclarationFields as $name => $columnName) {
+      CustomField::update(FALSE)
+        ->addValue('name', $name)
+        ->addWhere('column_name', '=', $columnName)
+        ->execute();
+    }
+    foreach ($giftAidContributionFields as $name => $columnName) {
+      CustomField::update(FALSE)
+        ->addValue('name', $name)
+        ->addWhere('column_name', '=', $columnName)
+        ->execute();
+    }
 
     return TRUE;
   }
 
   /**
-   * Create Giftaid batch type.
+   * Add the specified option group, gracefully if it already exists.
+   *
+   * @param CRM_Queue_TaskContext $ctx
+   * @param array $params
+   * @param array $options
+   *
+   * @return bool
    */
-  public function upgrade_3103() {
-    $this->log('Applying update 3103');
+  public static function addOptionGroup(CRM_Queue_TaskContext $ctx, $params, $options): bool {
+    $defaults = ['is_active' => 1];
+    $optionDefaults = ['is_active' => 1];
+    $optionDefaults['option_group_id'] = \CRM_Core_BAO_OptionGroup::ensureOptionGroupExists(array_merge($defaults, $params));
 
-    CRM_Core_BAO_OptionValue::ensureOptionValueExists(
-      [
-        'option_group_id' => "batch_type",
-        'label' => 'Giftaid Batch',
-        'name' => 'giftaid_batch',
-        'description' => 'Giftaid Batch Type',
-      ]
-    );
-
+    foreach ($options as $option) {
+      \CRM_Core_BAO_OptionValue::ensureOptionValueExists(array_merge($optionDefaults, $option));
+    }
     return TRUE;
   }
 
-  /**  Remove all the report that registerd on GiftAid 1.0beta and 2.0beta
-  **/
-  static function removeLegacyRegisteredReport(){
-    $reportClass = new CRM_Core_DAO_OptionValue();
-    $reportClass->option_group_id = self::getReportTemplateGroupId();
-    $reportClass->name = 'GiftAid_Report_Form_Contribute_GiftAid';
-    if ($reportClass->find(TRUE)) {
-      $reportClass->delete();
+  /**
+   * @return array
+   */
+  private function getCustomFields() {
+    if (empty($this->declarationCustomGroupID)) {
+      throw new \RuntimeException("CRM_Civigiftaid_Upgrader::getCustomFields called before declarationCustomGroupID defined.");
+    }
+    if (empty($this->contributionGiftaidCustomGroupId)) {
+      throw new \RuntimeException("CRM_Civigiftaid_Upgrader::getCustomFields called before contributionGiftaidCustomGroupId defined.");
+    }
+
+    $customFields = [
+      // For contacts' declarations...
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'eligible_for_gift_aid',
+        'label' => 'UK Tax Payer?',
+        'data_type' => 'Int',
+        'html_type' => 'Radio',
+        'is_required' => '1',
+        'is_searchable' => '1',
+        'is_search_range' => '0',
+        'weight' => '1',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'eligible_for_gift_aid',
+        'option_group_id' => $this->optionGroupNameToId['eligibility_declaration_options'],
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'address',
+        'label' => 'Address',
+        'data_type' => 'Memo',
+        'html_type' => 'TextArea',
+        'is_required' => '0',
+        'is_searchable' => '1',
+        'is_search_range' => '0',
+        'weight' => '2',
+        'help_pre' => 'The address and post code are automatically copied from the contact\'s "Home" address and formatted for submission to HMRC. You don\'t normally need to make any changes here.',
+        'attributes' => 'rows=4, cols=60',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'address',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'post_code',
+        'label' => 'Post Code',
+        'data_type' => 'String',
+        'html_type' => 'Text',
+        'is_required' => '0',
+        'is_searchable' => '1',
+        'is_search_range' => '0',
+        'weight' => '3',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '16',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'post_code',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'given_date',
+        'label' => 'Date declaration given',
+        'data_type' => 'Date',
+        'html_type' => 'Select Date',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '4',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'date_format' => 'dd-mm-yy',
+        'time_format' => 2,
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'given_date',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'start_date',
+        'label' => 'Start Date',
+        'data_type' => 'Date',
+        'html_type' => 'Select Date',
+        'is_required' => '1',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '4',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'date_format' => 'dd-mm-yy',
+        'time_format' => 2,
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'start_date',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'end_date',
+        'label' => 'End Date',
+        'data_type' => 'Date',
+        'html_type' => 'Select Date',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '5',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'date_format' => 'dd-mm-yy',
+        'time_format' => 2,
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'end_date',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'reason_ended',
+        'label' => 'Reason Ended',
+        'data_type' => 'String',
+        'html_type' => 'Radio',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '6',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '32',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'reason_ended',
+        'option_group_id' => $this->optionGroupNameToId['reason_ended'],
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'source',
+        'label' => 'Source',
+        'data_type' => 'String',
+        'html_type' => 'Text',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '7',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'source',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'notes',
+        'label' => 'Notes',
+        'data_type' => 'Memo',
+        'html_type' => 'TextArea',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '8',
+        'attributes' => 'rows=4, cols=60',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'notes',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->declarationCustomGroupID,
+        'name' => 'scanned_declaration',
+        'label' => 'Scanned Declaration',
+        'data_type' => 'File',
+        'html_type' => 'File',
+        'is_required' => '0',
+        'is_searchable' => '0',
+        'is_search_range' => '0',
+        'weight' => '9',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'scanned_declaration',
+        'in_selector' => '0',
+      ],
+
+      // For Contributions' status
+      [
+        'custom_group_id' => $this->contributionGiftaidCustomGroupId,
+        'name' => 'eligible_for_gift_aid',
+        'label' => 'Eligible for Gift Aid?',
+        'data_type' => 'Int',
+        'html_type' => 'Radio',
+        'is_required' => '0',
+        'is_searchable' => '1',
+        'is_search_range' => '0',
+        'weight' => '1',
+        'help_pre' => '\'Eligible for Gift Aid\' will be set automatically based on the financial type of the contribution if you do not select Yes or No',
+        'is_active' => '1',
+        'is_view' => '0',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'eligible_for_gift_aid',
+        'option_group_id' => $this->optionGroupNameToId['uk_taxpayer_options'],
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->contributionGiftaidCustomGroupId,
+        'name' => 'amount',
+        'label' => 'Eligible Amount',
+        'data_type' => 'Money',
+        'html_type' => 'Text',
+        'is_required' => '0',
+        'is_searchable' => '1',
+        'is_search_range' => '1',
+        'weight' => '2',
+        'is_active' => '1',
+        'is_view' => '1',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'amount',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->contributionGiftaidCustomGroupId,
+        'name' => 'gift_aid_amount',
+        'label' => 'Gift Aid Amount',
+        'data_type' => 'Money',
+        'html_type' => 'Text',
+        'is_required' => '0',
+        'is_searchable' => '1',
+        'is_search_range' => '1',
+        'weight' => '3',
+        'is_active' => '1',
+        'is_view' => '1',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'gift_aid_amount',
+        'in_selector' => '0',
+      ],
+      [
+        'custom_group_id' => $this->contributionGiftaidCustomGroupId,
+        'name' => 'batch_name',
+        'label' => 'Batch Name',
+        'html_type' => 'Select',
+        'default_value' => '',
+        'is_required' => '0',
+        'is_searchable' => '1',
+        'is_search_range' => '0',
+        'weight' => '4',
+        'is_active' => '1',
+        'is_view' => '1',
+        'text_length' => '255',
+        'note_columns' => '60',
+        'note_rows' => '4',
+        'column_name' => 'batch_name',
+        'option_group_id' => $this->optionGroupNameToId['giftaid_batch_name'],
+        'in_selector' => '0',
+      ],
+    ];
+
+    return $customFields;
+  }
+
+  private function getOptionGroups() {
+    // eligibility_declaration_options is for the Gift Aid Declaration, i.e. on the contact (3 options)
+    // uk_taxpayer_options is for the Gift Aid Contribution (2 options)
+    $optionGroups = [
+      'eligibility_declaration_options' => [
+        'name' => 'eligibility_declaration_options',
+        'title' => E::ts('GiftAid eligibility declaration options'),
+        'is_active' => 1,
+        'is_reserved' => 1,
+      ],
+      'uk_taxpayer_options' => [
+        'name' => 'uk_taxpayer_options',
+        'title' => E::ts('GiftAid contribution eligibility'),
+        'is_active' => 1,
+        'is_reserved' => 1
+      ],
+      'giftaid_basic_rate_tax' => [
+        'name' => 'giftaid_basic_rate_tax',
+        'title' => E::ts('GiftAid basic rate of tax'),
+        'is_active' => 1,
+        'is_reserved' => 1
+      ],
+      'giftaid_batch_name' => [
+        'name' => 'giftaid_batch_name',
+        'title' => E::ts('GiftAid batch name'),
+        'is_active' => 1,
+        'is_reserved' => 1
+      ],
+      'reason_ended' => [
+        'name' => 'reason_ended',
+        'title' => E::ts('GiftAid reason ended'),
+        'is_active' => 1,
+        'is_reserved' => 1
+      ],
+      // 'Core optiongroup - Added in CiviCRM 5.44. Add/update entity_batch_extends option group and add civicrm_contribution
+      'entity_batch_extends' => [
+        'name' => 'entity_batch_extends',
+        'title' => E::ts('Entity Batch Extends'),
+        'is_reserved' => 1,
+        'is_active' => 1,
+        'is_locked' => 1,
+      ],
+    ];
+    $optionGroups['batch_type'] = [];
+    return $optionGroups;
+  }
+
+  private function getOptionValues() {
+    $contributeComponentID = CRM_Core_DAO::singleValueQuery('SELECT id from civicrm_component WHERE name = "CiviContribute"');
+
+    $optionValues = [
+      // eligibility_declaration_options: these apply to contacts and record details
+      // about their declarations.
+      [
+        'option_group_id' => $this->optionGroupNameToId['eligibility_declaration_options'],
+        'label' => 'Yes, today and in the future',
+        'value' => 1,
+        'name' => 'eligible_for_giftaid',
+        'is_default' => 0,
+        'weight' => 2,
+        'is_reserved' => 1,
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['eligibility_declaration_options'],
+        'label' => 'No',
+        'value' => 0,
+        'name' => 'not_eligible_for_giftaid',
+        'is_default' => 0,
+        'weight' => 3,
+        'is_reserved' => 1,
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['eligibility_declaration_options'],
+        'label' => 'Yes, and for donations made in the past 4 years',
+        'value' => 3,
+        'name' => 'past_four_years',
+        'is_default' => 0,
+        'weight' => 1,
+        'is_reserved' => 1,
+      ],
+      // uk_taxpayer_options: these apply to profiles
+      [
+        'option_group_id' => $this->optionGroupNameToId['uk_taxpayer_options'],
+        'label' => 'Yes',
+        'value' => 1,
+        'name' => 'yes_uk_taxpayer',
+        'is_default' => 0,
+        'is_reserved' => 1,
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['uk_taxpayer_options'],
+        'label' => 'No',
+        'value' => 0,
+        'name' => 'not_uk_taxpayer',
+        'is_default' => 0,
+        'is_reserved' => 1,
+      ],
+
+      // These apply to why a declaration has an end date.
+      [
+        'option_group_id' => $this->optionGroupNameToId['reason_ended'],
+        'label' => 'Contact Declined',
+        'value' => 'Contact Declined',
+        'name' => 'Contact_Declined',
+        'is_default' => 0,
+        'weight' => 2,
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['reason_ended'],
+        'label' => 'HMRC Declined',
+        'value' => 'HMRC Declined',
+        'name' => 'HMRC_Declined',
+        'is_default' => 0,
+        'weight' => 1,
+      ],
+
+      // Tax rates
+      [
+        'option_group_id' => $this->optionGroupNameToId['giftaid_basic_rate_tax'],
+        'label' => 'The basic rate tax',
+        'value' => 20,
+        'name' => 'basic_rate_tax',
+        'is_default' => 0,
+        'weight' => 1,
+        'is_reserved' => 1,
+        'description' => 'The GiftAid basic tax rate (%)'
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['batch_type'],
+        'name' => 'Gift Aid',
+        'is_active' => 1,
+        'is_reserved' => 1,
+        'is_default' => 0,
+      ],
+      // entity_batch_extends (Core optiongroup from 5.44) - giftaid only needs civicrm_contribution optionValue.
+      [
+        'option_group_id' => $this->optionGroupNameToId['entity_batch_extends'],
+        'name' => 'civicrm_financial_trxn',
+        'value' => 'civicrm_financial_trxn',
+        'label' => E::ts('Financial Transactions'),
+        'component_id' => $contributeComponentID,
+      ],
+      [
+        'option_group_id' => $this->optionGroupNameToId['entity_batch_extends'],
+        'name' => 'civicrm_contribution',
+        'value' => 'civicrm_contribution',
+        'label' => E::ts('Contributions'),
+        'component_id' => $contributeComponentID,
+      ],
+    ];
+
+    return $optionValues;
+  }
+
+  private function setOptionGroups() {
+    foreach ($this->getOptionGroups() as $groupName => $groupParams) {
+      // Create the option groups.
+      $optionGroups[$groupName] = civicrm_api3('OptionGroup', 'get', [
+        'name' => $groupName,
+      ]);
+      if (!empty($optionGroups[$groupName]['id'])) {
+        $groupParams['id'] = $optionGroups[$groupName]['id'];
+      }
+      // Add new option groups and options
+      $optionGroups[$groupName] = civicrm_api3('OptionGroup', 'create', $groupParams);
+      // Save the look up of this group's ID.
+      $this->optionGroupNameToId[$groupName] = $optionGroups[$groupName]['id'];
+    }
+
+    // Create the values within the groups.
+    $optionValues = $this->getOptionValues();
+    foreach($optionValues as $params) {
+      $optionValue = civicrm_api3('OptionValue', 'get', [
+        'option_group_id' => $params['option_group_id'],
+        'name' => $params['name'],
+      ]);
+      if (CRM_Utils_Array::value('id', $optionValue)) {
+        $params['id'] = $optionValue['id'];
+      }
+      civicrm_api3('OptionValue', 'create', $params);
     }
   }
 
-  static function getReportTemplateGroupId(){
-    $params = array(
-      'version' => 3,
-      'name' => 'report_template',
-    );
-    $og = civicrm_api('OptionGroup', 'getsingle', $params);
-    $ogId = CRM_Utils_Array::value('id', $og);
-    return $ogId;
+  /**
+   * Enable/Disable option groups
+   * @param int $enable
+   */
+  private function enableOptionGroups($enable = 1) {
+    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = {$enable} WHERE name = 'giftaid_batch_name'");
+    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = {$enable} WHERE name = 'giftaid_basic_rate_tax'");
+    CRM_Core_DAO::executeQuery("UPDATE civicrm_option_group SET is_active = {$enable} WHERE name = 'reason_ended'");
+
+    try {
+      civicrm_api3('CustomGroup', 'update', [
+        'is_active' => $enable,
+        'id' => CRM_Utils_Array::value('id', civicrm_api3('CustomGroup', 'getsingle', ['name' => 'gift_aid'])),
+      ]);
+    }
+    catch (Exception $e) {
+      // Couldn't find CustomGroup, maybe it was manually deleted
+    }
+
+    try {
+      civicrm_api3('CustomGroup', 'update', [
+        'is_active' => $enable,
+        'id' => CRM_Utils_Array::value('id', civicrm_api3('CustomGroup', 'getsingle', ['name' => 'gift_aid_declaration'])),
+      ]);
+    }
+    catch (Exception $e) {
+      // Couldn't find CustomGroup, maybe it was manually deleted
+    }
+
+    try {
+      civicrm_api3('UFGroup', 'update', [
+        'is_active' => $enable,
+        'id' =>  CRM_Utils_Array::value('id',civicrm_api3('UFGroup', 'getsingle', ['name' => 'gift_aid'])),
+      ]);
+    }
+    catch (Exception $e) {
+      // Couldn't find CustomGroup, maybe it was manually deleted
+    }
   }
 
-  static function migrateOneToTwo($ctx){
+  /**
+   * Remove report templates created by older versions
+   */
+  private static function removeLegacyRegisteredReport() {
+    $report1 = civicrm_api3('OptionValue', 'get', [
+      'option_group_id' => "report_template",
+      'name' => 'GiftAid_Report_Form_Contribute_GiftAid',
+    ]);
+    $report2 = civicrm_api3('OptionValue', 'get', [
+      'option_group_id' => "report_template",
+      'value' => 'civicrm/contribute/uk-giftaid',
+    ]);
+
+    $reports = [];
+    if (!empty($report1['count'])) {
+      $reports[] = CRM_Utils_Array::first($report1['values']);
+    }
+    if (!empty($report2['count'])) {
+      $reports[] = CRM_Utils_Array::first($report2['values']);
+    }
+    foreach ($reports as $report) {
+      civicrm_api3('OptionValue', 'delete', ['id' => $report['id']]);
+    }
+  }
+
+  private static function migrateOneToTwo($ctx){
     $ctx->executeSqlFile('sql/upgrade_20.sql');
     $query = "SELECT DISTINCT batch_name
               FROM civicrm_value_gift_aid_submission
              ";
-    $batchNames = array();
+    $batchNames = [];
     $dao = CRM_Core_DAO::executeQuery($query);
     while ($dao->fetch()) {
       array_push($batchNames, $dao->batch_name);
     }
-    $gId = CRM_Utils_Array::value('id',civicrm_api('OptionGroup', 'getsingle', array(
-        'version' => 3,
-        'name' => 'giftaid_batch_name')
-    ));
-    if($gId){
+    $gId = CRM_Utils_Array::value('id',civicrm_api3('OptionGroup', 'getsingle', ['name' => 'giftaid_batch_name']));
+    if ($gId) {
       foreach ($batchNames as $name) {
-        $params = array(
-          'version' => 3,
+        $params = [
           'option_group_id' => $gId,
-          'label' => $name,
           'name' => $name,
-          'value' => $name,
-          'is_active' => 1
-        );
-        $result = civicrm_api('OptionValue', 'create', $params);
+        ];
+        $existing = civicrm_api3('OptionValue', 'get', $params);
+        if (empty($existing['count'])) {
+          $params['label'] = $name;
+          $params['value'] = $name;
+          $params['is_active'] = 1;
+          civicrm_api3('OptionValue', 'create', $params);
+        }
       }
     }
-  }
-
-  public static function migrateToThree($ctx) {
-    $ctx->executeSqlFile('sql/upgrade_3100');
   }
 
   /**
    * Set the default admin settings for the extension.
    */
   private function setDefaultSettings() {
-    $settings = new stdClass();
-
-    // Set 'Globally Enabled' by default
-    $settings->globally_enabled = 1;
-    $settings->financial_types_enabled = [];
-
-    \Civi::settings()->set($this->getExtensionKey() . ':settings', $settings);
+    Civi::settings()->set(E::SHORT_NAME . '_globally_enabled', 1);
+    Civi::settings()->set(E::SHORT_NAME . '_financial_types_enabled', []);
   }
 
   /**
    * Remove the admin settings for the extension.
-   *
-   * @throws \CRM_Extension_Exception
    */
   private function unsetSettings() {
-    $settingName = $this->getExtensionKey() . ':settings';
-
-    CRM_Core_BAO_Setting::executeQuery("DELETE FROM civicrm_setting WHERE name = '{$settingName}'");
+    Civi::settings()->revert(E::SHORT_NAME . '_globally_enabled');
+    Civi::settings()->revert(E::SHORT_NAME . '_financial_types_enabled');
   }
 
   /**
    * Create default settings for existing batches, for which settings don't already exist.
    */
   private static function importBatches() {
-    $sql = /** @lang MySQL */
-      "
+    $sql = "
       SELECT id
       FROM civicrm_batch
       WHERE name LIKE 'GiftAid%'
@@ -457,34 +1317,17 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       // Only add settings for batches for which settings don't exist already
       if (CRM_Civigiftaid_BAO_BatchSettings::findByBatchId($dao->id) === FALSE) {
         // Set globally enabled to TRUE by default, for existing batches
-        CRM_Civigiftaid_BAO_BatchSettings::create(array(
+        CRM_Civigiftaid_BAO_BatchSettings::create([
           'batch_id' => (int) $dao->id,
-          'financial_types_enabled' => array(),
+          'financial_types_enabled' => [],
           'globally_enabled' => TRUE,
           'basic_rate_tax' => $basicRateTax
-        ));
+        ]);
       }
     }
   }
 
-  /**
-   * @return string
-   * @throws \CRM_Extension_Exception
-   * @throws \CRM_Extension_Exception_ParseException
-   */
-  private function getExtensionKey() {
-    $info = CRM_Extension_Info::loadFromFile(__DIR__ . '/../../info.xml');
-
-    if (empty($info->key)) {
-      throw new CRM_Extension_Exception('Extension key not found for Gift Aid extension');
-    }
-
-    return $info->key;
-  }
-
   private function log($message) {
-    if (is_object($this->ctx) && method_exists($this->ctx, 'info')) {
-      $this->ctx->log->info($message);
-    }
+    Civi::log()->info($message);
   }
 }

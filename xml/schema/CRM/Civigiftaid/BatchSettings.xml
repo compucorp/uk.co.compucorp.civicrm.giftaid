@@ -52,7 +52,9 @@
 
   <field>
     <name>basic_rate_tax</name>
-    <type>decimal(4,2)</type>
+    <type>decimal</type>
+    <length>4,2</length>
+    <required>true</required>
     <title>Basic Rate Tax</title>
     <comment>Basic rate tax for the batch.</comment>
     <add>4.4</add>
