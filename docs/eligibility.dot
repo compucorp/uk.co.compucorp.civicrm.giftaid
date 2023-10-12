@@ -1,0 +1,73 @@
+digraph A {
+  graph [fontname="Lato"]
+  node [fontname="Lato", shape=rectangle]
+  edge [fontname="Lato"]
+
+  contribCreate [label="Contribution.create"]
+
+  contribCreate->BAOsave
+
+  BAOsave [label="BAO Save"]
+  BAOsave->hookPost
+  hookPost [label="hook_post:\nCRM_Civigiftaid_SetContributionGiftAidEligibility::run"]
+  hookPost->trans
+  trans [label="transaction?", shape=diamond]
+    trans -> schedule [label="yes"]
+    schedule [label="schedule callback for post commit"]
+    trans -> runCallback [label="no"]
+
+  runCallback [label="runCallback"]
+  schedule->runCallback
+
+  runCallback->setGiftAidEligibilityStatus
+
+  setGiftAidEligibilityStatus -> qAlreadySet
+  qAlreadySet [label="contrib eligibility already\nset to yes or no?", shape=diamond]
+    qAlreadySet->calcContribElig [label="No"]
+      calcContribElig [label="calculate eligibility from financial type"]
+      calcContribElig->updateGiftAidFields
+    qAlreadySet->updateGiftAidFields [label="Yes"]
+
+  updateGiftAidFields [label="CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields\n(logic shown below applies only to this use case)"]
+  updateGiftAidFields->setBatch
+
+  setBatch [label="Set batch to '' if new contrib and part of recurring."]
+  setBatch->setContribEl
+  setContribEl [label="Set contribution's Eligible_for_Gift_Aid"]
+  setContribEl->setContribAmounts
+  setContribAmounts [label="Set contribution's GA amount and gift_aid_amount"]
+  setContribAmounts->saveContribGA
+  saveContribGA [label="Save with CustomValue.create API"]
+
+  saveContribGA -> end
+
+  end [label="Done"]
+
+
+//  start [label="Set out what needs doing,\nwhat the budget is.", style="filled", fillcolor="#ffee88"]
+
+// qStaffInterestCount [label="How many staff are\ncapable, interested and available\nto do this work\nwith normal pay and conditions?", shape=diamond]
+// selectionProcess [label="Selection process?", shape=rectangle]
+// qSkills [label="Feasible to\ndevelop skills?", shape=diamond]
+// qUrgent [label="Urgent?", shape=diamond]
+// qEmploy [label="Legally\nemployment?", shape=diamond]
+// qConsultant [label="Skills required\nfavour consultant?", shape=diamond]
+//
+// endTempContract [label="Temporary contract ammendment", shape=rectangle, style="rounded,filled",fillcolor="#ddffcc"]
+// endConsultant [label="Find consultant", shape=rectangle, style="rounded,filled",fillcolor="#ddffcc"]
+// endRecruit [label="Recruit on\nfixed term", shape=rectangle, style="rounded,filled",fillcolor="#ddffcc"]
+//
+// start -> qStaffInterestCount [color="#ff0000"]
+// qSkills -> qStaffInterestCount [label="Yes"]
+// qStaffInterestCount -> endTempContract [label="1"]
+// qStaffInterestCount -> selectionProcess [label="2+"]
+// qStaffInterestCount -> qSkills [label="none"]
+// selectionProcess -> endTempContract
+// qSkills -> qEmploy [label="No"]
+// qEmploy -> qUrgent [label="No"]
+// qUrgent -> endConsultant [label="Yes"]
+// qUrgent -> qConsultant [label="No"]
+// qConsultant -> endConsultant [label="Yes"]
+// qConsultant -> endRecruit [label="No"]
+// qEmploy -> endRecruit [label="Yes", weight=2]
+}
