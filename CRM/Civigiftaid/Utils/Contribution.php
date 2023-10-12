@@ -402,6 +402,14 @@ class CRM_Civigiftaid_Utils_Contribution {
     $contributionIdStr = implode(',', $contributionIds);
     $contributionDetails = self::addContributionDetails($contributionIdStr, $contributionDetails);
 
+    if (count($contributionDetails)) {
+      array_walk($contributionDetails, function (&$contribution) {
+        $contribution['line_items'] = [];
+      });
+
+      self::addLineItemDetails($contributionIdStr, $contributionDetails);
+    }
+
     return $contributionDetails;
   }
 
@@ -533,6 +541,58 @@ class CRM_Civigiftaid_Utils_Contribution {
       $contributionDetails[$dao->contribution_id]['line_items_count'] = $dao->line_item_count;
     }
     return $contributionDetails;
+  }
+
+  /**
+   * Add Line item details to contributions data.
+   *
+   * @param string $contributionIdStr
+   * @param array $contributionDetails
+   *
+   * @return mixed
+   */
+  private static function addLineItemDetails($contributionIdStr, $contributionDetails) {
+    $query = "
+      SELECT c.id, i.entity_table, i.label, i.line_total, i.qty, c.currency, t.name
+      FROM civicrm_contribution c
+      LEFT JOIN civicrm_line_item i
+      ON c.id = i.contribution_id
+      LEFT JOIN civicrm_financial_type t
+      ON i.financial_type_id = t.id
+      WHERE c.id IN ($contributionIdStr)";
+
+    if (!\Civi::settings()->get('civigiftaid_globally_enabled')) {
+      $enabledTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
+      if (empty($enabledTypes)) {
+        // if no financial types are selected
+        return;
+      }
+      $enabledTypesStr = implode(', ', $enabledTypes);
+
+      // if no financial types are selected, don't return anything from query
+      $query .= $enabledTypesStr
+        ? " AND i.financial_type_id IN ({$enabledTypesStr})"
+        : " AND 0";
+    }
+
+    $dao = CRM_Core_DAO::executeQuery($query);
+    while ($dao->fetch()) {
+      if (isset($contributionDetails[$dao->id])) {
+        $item = static::getLineItemName($dao->entity_table);
+
+        $lineItem = [
+          'item' => $item,
+          'description' => $dao->label,
+          'financial_type' => $dao->name,
+          'amount' => CRM_Utils_Money::format(
+            $dao->line_total,
+            $dao->currency
+          ),
+          'qty' => (int) $dao->qty,
+        ];
+        $contributionDetails[$dao->id]['line_items'][] = $lineItem;
+      }
+    }
   }
 
   /**
