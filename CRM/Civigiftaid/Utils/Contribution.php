@@ -60,7 +60,7 @@ class CRM_Civigiftaid_Utils_Contribution {
           'entity_table' => 'civicrm_contribution',
         ]);
 
-        self::updateGiftAidFields($contribution['id'], NULL, $batchName, $addToBatch = TRUE);
+        self::updateGiftAidFields($contribution['id'], $contribution['gift_aid.eligible_for_gift_aid'], $batchName, $addToBatch = TRUE);
 
         $contributionsAdded[] = $contribution['id'];
       }
