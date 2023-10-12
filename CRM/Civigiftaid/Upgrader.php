@@ -416,7 +416,6 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     }
     catch (\Exception $e) {
       Civi::log()->error("FAILED ON: " .json_encode([$entity, $findParams, $requiredParams, $additionalCreateParams]));
-      throw $e;
     }
   }
 
@@ -565,6 +564,32 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
   }
 
   public function upgrade_3109() {
+    $this->log('Move contributions having "Yes, in the past 4 years" to "Yes" option value');
+    try {
+      $result = civicrm_api3('CustomField', 'get', [
+        'sequential' => 1,
+        'return' => ["id"],
+        'name' => "Eligible_for_Gift_Aid",
+        'custom_group_id' => "Gift_Aid",
+      ]);
+      if (empty($result['is_error']) && !empty($result['id'])) {
+        $custom_id_field = "custom_" . $result['id'];
+        $result = civicrm_api3('Contribution', 'get', [
+          'sequential' => 1,
+          'return' => ["id"],
+          $custom_id_field => CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS,
+        ]);
+        foreach ($result['values'] as $contribution) {
+          civicrm_api3('Contribution', 'create', [
+            'id' => $contribution['id'],
+            $custom_id_field => CRM_Civigiftaid_Declaration::DECLARATION_IS_YES,
+          ]);
+        }
+      }
+    } catch (Exception $e) {
+      \Civi::log()->error('Failed to move contributions option value. ' . $e->getMessage());
+    }
+
     $this->log('Disable "Yes, in the past 4 years" for contributions if it exists');
     try {
       $optionValueParams = [
@@ -573,7 +598,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
       ];
       $optionValue = civicrm_api3('OptionValue', 'getsingle', $optionValueParams);
       $optionValueParams['id'] = $optionValue['id'];
-      if (empty($optionValue['is_active'])) {
+      if (!empty($optionValue['is_active'])) {
         $optionValueParams['is_active'] = 0;
         civicrm_api3('OptionValue', 'create', $optionValueParams);
       }
