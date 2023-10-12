@@ -285,6 +285,20 @@ class CRM_Civigiftaid_Declaration {
   }
 
   /**
+   * Deletes a contact declaration with null start date.
+   *
+   * @param array $params
+   *    Declaration params.
+   */
+  public static function deleteDeclarationWithNullStartDate(&$params) {
+    CRM_Utils_SQL_Delete::from('civicrm_value_gift_aid_declaration')
+      ->where('entity_id = #contact', ['contact' => $params['entity_id']])
+      ->where('start_date IS NULL')
+      ->execute();
+    unset($params['id']);
+  }
+
+  /**
    * Delete all declarations that are missing a postcode and a start_date for
    * the given contact.
    *
@@ -367,6 +381,12 @@ class CRM_Civigiftaid_Declaration {
         $endTimestamp = strtotime($futureDeclaration['start_date']);
       }
     }
+
+    // There are cases when CiviCRM creates a new declaration with null
+    // start_date before the appropriate hook that uses this function is
+    // called, if that happens we delete such declaration before creating
+    // a new one.
+    CRM_Civigiftaid_Declaration::deleteDeclarationWithNullStartDate($newParams);
 
     // Order of preference: PAST_4_YEARS > YES > YES
     switch ($newParams['eligible_for_gift_aid']) {
