@@ -11,6 +11,7 @@
 
 use Civi\Api4\CustomField;
 use Civi\Api4\CustomGroup;
+use Civi\Api4\OptionValue;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -419,6 +420,31 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
     }
   }
 
+  private function getReportTemplateGroupId(){
+    $params = [
+      'version' => 3,
+      'name' => 'report_template',
+    ];
+    $og = civicrm_api('OptionGroup', 'getsingle', $params);
+    $ogId = CRM_Utils_Array::value('id', $og);
+    return $ogId;
+  }
+
+  private function ensureReportInstanceExist() {
+    $ogId = $this->getReportTemplateGroupId();
+    
+    return CRM_Core_BAO_OptionValue::ensureOptionValueExists([
+      'option_group_id' => $ogId,
+      'label' => 'Gift Aid Report',
+      'name' => self::REPORT_CLASS,
+      'value' => self::REPORT_URL,
+      'description' => 'Gift Aid Report - For submitting Gift Aid reports to HMRC treasury.',
+      'component_id' => CRM_Core_DAO::getFieldValue('CRM_Core_DAO_Component', 'CRM_Contribute', 'id', 'namespace'),
+      'is_active' => 1,
+      'version' => 3,
+    ]);
+  }
+
   private function createReportInstance() {
     // Now see if we have a report and create one if we don't
     try {
@@ -432,9 +458,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
 
     if (!$reportID) {
       try {
-        $reportTemplate = civicrm_api3('ReportTemplate', 'getsingle', [
-          'value' => CRM_Civigiftaid_Upgrader::REPORT_URL,
-        ]);
+        $reportTemplate = $this->ensureReportInstanceExist();
         civicrm_api3('ReportInstance', 'create', [
           'title' => $reportTemplate['label'],
           'report_id' => $reportTemplate['value'],
