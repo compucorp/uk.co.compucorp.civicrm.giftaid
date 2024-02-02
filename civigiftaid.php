@@ -414,12 +414,12 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
  */
 function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value, $entityId, $fieldInfo) {
   // Gift Aid batch name is stored as "name" but we want to display "label".
-  if ($fieldInfo['name'] === 'batch_name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value)) {
+  if ($fieldInfo['name'] === 'batch_name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value) && is_array($value)) {
     try {
       $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
       $displayValue = civicrm_api3('OptionValue', 'getvalue', [
         'option_group_id' => $optionGroupID,
-        'name' => $value,
+        'value' => $value[0] ?? $value,
         'return' => 'label',
       ]);
     }
@@ -427,6 +427,30 @@ function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value
       // Do nothing, we'll use the existing displayValue
       // This will fail for older batches which stored the label instead of the name for the batch_name field.
     }
+  }
+}
+
+function civigiftaid_civicrm_customFieldOptions($fieldID, &$options, $detailedFormat = false ) {
+  $customField = \Civi\Api4\CustomField::get(FALSE)
+    ->addSelect('custom_group_id:name', 'name')
+    ->addWhere('id', '=', $fieldID)
+    ->addWhere('custom_group_id:name', '=', 'gift_aid')
+    ->execute()
+    ->first();
+  
+  if (empty($customField) || $customField['name'] != 'batch_name') {
+    return ;
+  }
+
+  //transform options from id => label to name => label
+  if (!$detailedFormat) {
+    $optionValues = \Civi\Api4\OptionValue::get(FALSE)
+      ->addSelect('name', 'id', 'value', 'label')
+      ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+      ->execute()
+      ->getArrayCopy();
+
+    $options = array_combine(array_column($optionValues, 'name'), array_column($optionValues, 'label'));
   }
 }
 
