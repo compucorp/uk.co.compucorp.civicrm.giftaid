@@ -41,7 +41,7 @@
               </td>
               <td>{$row.gift_aidable_amount}</td>
               <td>{$row.total_amount}</td>
-              <td>{$row.line_items|@count}</td>
+              <td>{$row.line_items_count}</td>
               <td>{$row.financial_account}</td>
               <td>{$row.source}</td>
               <td>{$row.receive_date}</td>
@@ -85,7 +85,7 @@
               </td>
               <td>{$row.gift_aidable_amount}</td>
               <td>{$row.total_amount}</td>
-              <td>{$row.line_items|@count}</td>
+              <td>{$row.line_items_count}</td>
               <td>{$row.financial_account}</td>
               <td>{$row.source}</td>
               <td>{$row.receive_date}</td>
@@ -129,7 +129,7 @@
               </td>
               <td>{$row.gift_aidable_amount}</td>
               <td>{$row.total_amount}</td>
-              <td>{$row.line_items|@count}</td>
+              <td>{$row.line_items_count}</td>
               <td>{$row.financial_account}</td>
               <td>{$row.source}</td>
               <td>{$row.receive_date}</td>
