@@ -25,11 +25,25 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @throws \CiviCRM_API3_Exception
    */
   public static function runCallback($event) {
-    if (($event->entity !== 'Contribution') || !in_array($event->action, ['create', 'edit'])) {
+    if ((!in_array($event->entity, ['Contribution', 'LineItem'])) || !in_array($event->action, ['create', 'edit'])) {
       return;
     }
 
-    if (self::setGiftAidEligibilityStatus($event->id, $event->action)) {
+    $id = $event->id;
+    if ($event->entity == 'LineItem') {
+      $lineItem = \Civi\Api4\LineItem::get(FALSE)
+      ->addWhere('id', '=', $id)
+      ->execute()
+      ->first();
+      
+      $id = $lineItem['contribution_id'] ?? NULL;
+    }
+
+    if (empty($id)) {
+      return;
+    }
+
+    if (self::setGiftAidEligibilityStatus($id, $event->action)) {
       $event->object->find();
       if (!CRM_Civigiftaid_Declaration::getDeclaration($event->object->contact_id)) {
         if (CRM_Core_Session::getLoggedInContactID() && CRM_Core_Permission::check('access CiviContribute')) {
