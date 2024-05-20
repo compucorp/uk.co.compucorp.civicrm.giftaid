@@ -37,7 +37,7 @@
           {foreach from=$contributionsToRemoveRows item=row}
             <tr class="contribution" data-contribution-id="{$row.contribution_id}">
               <td>
-                <a href="{crmURL p='civicrm/contact/view' q="reset=1&cid=`$row.contact_id"}">{$row.display_name}</a>
+                <a href="{crmURL p='civicrm/contact/view' q="reset=1&cid=$row.contact_id"}">{$row.display_name}</a>
               </td>
               <td>{$row.gift_aidable_amount}</td>
               <td>{$row.total_amount}</td>
