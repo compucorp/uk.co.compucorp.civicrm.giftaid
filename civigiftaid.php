@@ -51,16 +51,6 @@ function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
     $ogId = $result['option_group_id'];
   }
 
-  $item[] =  [
-    'label' => E::ts('GiftAid'),
-    'name'       => 'admin_giftaid',
-    'url'        => NULL,
-    'permission' => 'access CiviContribute',
-    'operator'   => NULL,
-    'separator'  => 1,
-  ];
-  _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute', $item[0]);
-
   $item[] = [
     'label' => E::ts('GiftAid Basic Rate Tax'),
     'name'       => 'giftaid_basic_rate_tax',
@@ -70,16 +60,6 @@ function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
     'separator'  => NULL,
   ];
   _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute/admin_giftaid', $item[1]);
-
-  $item[] = [
-    'label'      => E::ts('Settings'),
-    'name'       => 'settings',
-    'url'        => "civicrm/admin/setting/ukgiftaid",
-    'permission' => 'access CiviContribute',
-    'operator'   => NULL,
-    'separator'  => NULL,
-  ];
-  _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute/admin_giftaid', $item[2]);
 
   _civigiftaid_civix_navigationMenu($event->params);
 }
