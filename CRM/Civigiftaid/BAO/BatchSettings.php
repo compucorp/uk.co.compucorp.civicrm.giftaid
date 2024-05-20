@@ -18,7 +18,7 @@ class CRM_Civigiftaid_BAO_BatchSettings extends CRM_Civigiftaid_DAO_BatchSetting
    *
    * @return \CRM_Civigiftaid_BAO_BatchSettings
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function create($params) {
     self::addDefaults($params);
@@ -54,7 +54,7 @@ class CRM_Civigiftaid_BAO_BatchSettings extends CRM_Civigiftaid_DAO_BatchSetting
    * @param array $params
    *
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   private static function addDefaults(&$params) {
     if (!isset($params['financial_types_enabled'])) {

@@ -26,7 +26,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @return array
    *           (total, addedContributionIDs, notAddedContributionIDs) ids of contributions added to the batch
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function addContributionToBatch($contributionIDs, $batchID) {
     $contributionsAdded = [];
@@ -92,7 +92,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param bool $updateIfHasBatchName - You must set this to TRUE to modify the batchName
    *
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function updateGiftAidFields($contributionID, $eligibleForGiftAid = NULL, $batchName = '', $updateIfHasBatchName = FALSE) {
     if (!empty($batchName) && !$updateIfHasBatchName) {
@@ -133,7 +133,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $contributionIDs
    *
    * @return array
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function removeContributionFromBatch($contributionIDs) {
     $contributionIDsRemoved = [];
@@ -225,7 +225,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    *
    * @return float
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function getBasicRateTax() {
     if (!isset(Civi::$statics[__CLASS__]['basictaxrate'])) {
@@ -329,7 +329,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    *
    * @return array
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function validateContributionToBatch($contributionIDs) {
     $contributionsAdded = [];
@@ -452,7 +452,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $contributionDetails
    *
    * @return array
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   private static function addContributionDetails($contributionIdStr, $contributionDetails) {
     // Get all contributions from found IDs that are not already in a batch
@@ -553,7 +553,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $contribution
    *
    * @return bool
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function isEligibleForGiftAid($contribution) {
     $isContributionEligible = self::isContributionEligible($contribution);
@@ -568,7 +568,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param int $limit
    *
    * @return array
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function getContributionsByDeclarations($declarations = [], $limit = 100) {
     $contributionsToSubmit = [];
@@ -596,7 +596,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $dateRange
    *
    * @return mixed
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function getContributionsByDateRange($contactId, $dateRange) {
     if (\Civi::settings()->get('civigiftaid_globally_enabled')) {

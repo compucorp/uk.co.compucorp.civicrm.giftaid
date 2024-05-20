@@ -26,7 +26,6 @@ class CRM_Civigiftaid_Declaration {
    * @param int $contributionID
    *
    * @throws \CRM_Core_Exception
-   * @throws \CiviCRM_API3_Exception
    */
   public static function update($contributionID) {
     // If declaration updated via contribution page etc. it will have been set in postProcess
@@ -68,7 +67,7 @@ class CRM_Civigiftaid_Declaration {
    * @param int $contactID
    *
    * @return array
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function getAddressAndPostalCode($contactID) {
     if (empty($contactID)) {
@@ -181,7 +180,7 @@ class CRM_Civigiftaid_Declaration {
    *
    * @param array $params
    *
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function updateDeclarationAddress($params) {
     // Get the current declaration for the contact
@@ -310,7 +309,6 @@ class CRM_Civigiftaid_Declaration {
    *               - end_date:   end date of declaration (in ISO date format)
    *
    * @throws \CRM_Core_Exception
-   * @throws \CiviCRM_API3_Exception
    */
   public static function setDeclaration($newParams) {
     if (empty($newParams['entity_id'])) {
@@ -533,7 +531,7 @@ class CRM_Civigiftaid_Declaration {
    * @param array $params
    *
    * @return array
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function addReasonEndedContactDeclined($params): array {
     $contactDeclined = civicrm_api3('OptionValue', 'get', [
@@ -555,7 +553,7 @@ class CRM_Civigiftaid_Declaration {
    * @param string $lastName
    *
    * @return array [[firstname,lastname], errors]
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function getFilteredDonorName($firstName, $lastName) {
     $errors = [];

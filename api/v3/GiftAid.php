@@ -27,7 +27,7 @@ function _civicrm_api3_gift_aid_getcontributioneligibility_spec(&$params) {
  *
  * @return array
  * @throws \CRM_Extension_Exception
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civicrm_api3_gift_aid_getcontributioneligibility($params) {
   $contribution = civicrm_api3('Contribution', 'getsingle', [
@@ -66,7 +66,7 @@ function _civicrm_api3_gift_aid_updateeligiblecontributions_spec(&$params) {
  *
  * @return array
  * @throws \CRM_Extension_Exception
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civicrm_api3_gift_aid_updateeligiblecontributions($params) {
   $params['options']['limit'] = $params['options']['limit'] ?? 0;

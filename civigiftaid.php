@@ -41,7 +41,7 @@ function civigiftaid_civicrm_enable() {
  * @param \Civi\Core\Event\GenericHookEvent $event
  * @param string $hookName
  *
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
   // Get optionvalue ID for basic rate tax setting
@@ -87,7 +87,7 @@ function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
 /**
  * Implements hook_civicrm_check().
  *
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civigiftaid_civicrm_check(&$messages) {
   $checks = new CRM_Civigiftaid_Check($messages);
@@ -136,7 +136,7 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
  * @param string $formName
  * @param \CRM_Core_Form $form
  *
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civigiftaid_civicrm_postProcess($formName, &$form) {
   // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
@@ -182,9 +182,8 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
  * @param $objectId
  * @param $objectRef
  *
- * @throws \CRM_Core_Exception
  * @throws \CRM_Extension_Exception
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef) {
   switch ($objectName) {
@@ -237,9 +236,8 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
  *
  * @param array $params
  *
- * @throws \CRM_Core_Exception
  * @throws \CRM_Extension_Exception
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civigiftaid_callback_civicrm_post_contribution($params) {
   if (isset(Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'])) {
@@ -262,7 +260,7 @@ function civigiftaid_callback_civicrm_post_contribution($params) {
  * @param CRM_Core_Form $form
  * @param array $errors
  *
- * @throws \CiviCRM_API3_Exception
+ * @throws \CRM_Core_Exception
  */
 function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, &$errors) {
   if ($formName == 'CRM_Contact_Form_CustomData') {

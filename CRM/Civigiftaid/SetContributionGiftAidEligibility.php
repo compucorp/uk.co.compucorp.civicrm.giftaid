@@ -22,7 +22,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @param \Civi\Core\Event\GenericHookEvent $event
    *
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function runCallback($event) {
     if (($event->entity !== 'Contribution') || !in_array($event->action, ['create', 'edit'])) {
@@ -63,7 +63,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    *   Whether the contribution was eligible
    *
    * @throws \CRM_Extension_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \CRM_Core_Exception
    */
   public static function setGiftAidEligibilityStatus($contributionID, $action = 'edit') {
     $contributionEligibleGiftAidFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid');
