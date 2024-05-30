@@ -1,0 +1,5 @@
+{
+    "name": "civicrm/ukgiftaid",
+    "description": "UK GiftAid Extension for CiviCRM",
+    "type": "civicrm-ext"
+}
