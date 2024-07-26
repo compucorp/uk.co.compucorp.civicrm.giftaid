@@ -3,7 +3,7 @@
 /**
  * Collection of upgrade steps
  */
-class CRM_Civigiftaid_Upgrader extends CRM_Civigiftaid_Upgrader_Base {
+class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
 
   const REPORT_CLASS = 'CRM_Civigiftaid_Report_Form_Contribute_GiftAid';
   const REPORT_URL = 'civicrm/contribute/report/uk-giftaid';
