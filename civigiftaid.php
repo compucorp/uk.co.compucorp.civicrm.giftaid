@@ -351,12 +351,23 @@ function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value
   // Gift Aid batch name is stored as "name" but we want to display "label".
   if ($fieldInfo['name'] === 'batch_name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value)) {
     try {
-      $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
-      $displayValue = civicrm_api3('OptionValue', 'getvalue', [
-        'option_group_id' => $optionGroupID,
-        'name' => $value,
-        'return' => 'label',
-      ]);
+      if (is_array($value)) {
+        $displayValues = \Civi\Api4\OptionValue::get(FALSE)
+          ->addSelect('label')
+          ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+          ->addWhere('name', 'IN', $value)
+          ->execute()
+          ->column('label');
+        $displayValue = implode(', ', $displayValues);
+      }
+      else {
+        $displayValue = \Civi\Api4\OptionValue::get(FALSE)
+          ->addSelect('label')
+          ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+          ->addWhere('name', '=', $value)
+          ->execute()
+          ->first()['label'];
+      }
     }
     catch (Exception $e) {
       // Do nothing, we'll use the existing displayValue
