@@ -6,7 +6,6 @@ use Civi\Api4\CustomValue;
 use CRM_Civigiftaid_ExtensionUtil as E;
 use Civi\Test\HeadlessInterface;
 use Civi\Test\HookInterface;
-use Civi\Test\TransactionalInterface;
 
 /**
  * Tests for CRM/Civigiftaid/Utils/Contribution.php class
