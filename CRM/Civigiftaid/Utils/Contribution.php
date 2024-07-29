@@ -120,10 +120,9 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
     if (isset($eligibleForGiftAid)) {
       $eligibleForGiftAid = (int) $eligibleForGiftAid;
-      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
       if ($eligibleForGiftAid === 0) {
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = NULL;
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = NULL;
+        $giftAidAmount = 0;
+        $giftAidableContribAmt = 0;
       }
       else {
         // Eligible - calculate gift aid amounts
@@ -133,9 +132,14 @@ class CRM_Civigiftaid_Utils_Contribution {
           ->first()['total_amount'];
         $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
         $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = $giftAidAmount;
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = $giftAidableContribAmt;
+        if ($giftAidAmount === 0 && $giftAidableContribAmt === 0) {
+          // If we don't have an enabled financialType contribution is not eligible
+          $eligibleForGiftAid = 0;
+        }
       }
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = $giftAidAmount;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = $giftAidableContribAmt;
     }
     $contributionParams['entity_id'] = $contributionID;
     // We use CustomValue.create instead of Contribution.create because Contribution.create is way too slow
