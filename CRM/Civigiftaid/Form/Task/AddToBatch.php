@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\OptionGroup;
+use Civi\Api4\OptionValue;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -103,15 +105,6 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
       CRM_Core_Error::statusBounce(E::ts('Missing name for new GiftAid batch - try creating the batch again?'), NULL, E::ts('GiftAid - Add to Batch'));
     }
 
-    $batchParams['title'] = $this->batchTitle;
-    $batchParams['name'] = $this->batchName;
-    $batchParams['description'] = $this->_submitValues['description'];
-    $batchParams['batch_type'] = 'Gift Aid';
-
-    $batchParams['created_id'] = $batchParams['modified_id'] = CRM_Core_Session::getLoggedInContactID();
-    $batchParams['created_date'] = $batchParams['modified_date'] = date("YmdHis");
-    $batchParams['status_id'] = 'Exported';
-    $batchParams['mode_id'] = 'Manual Batch';
     $session = new CRM_Core_Session();
     $contributionIDsToAdd = $session->get($this->batchName, E::SHORT_NAME);
 
@@ -121,43 +114,59 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
 
     $transaction = new CRM_Core_Transaction();
 
-    $createdBatch = civicrm_api3('Batch', 'create', $batchParams);
-    // Save current settings for the batch
-    CRM_Civigiftaid_BAO_BatchSettings::create(['batch_id' => $createdBatch['id']]);
+    try {
+      $createdBatch = \Civi\Api4\Batch::create(FALSE)
+        ->addValue('title', $this->batchTitle)
+        ->addValue('name', $this->batchName)
+        ->addValue('description', $this->_submitValues['description'])
+        ->addValue('type_id:name', 'Gift Aid')
+        ->addValue('created_id', CRM_Core_Session::getLoggedInContactID())
+        ->addValue('created_date', date('YmdHis'))
+        ->addValue('status_id:name', 'Exported')
+        ->addValue('mode_id:name', 'Manual Batch')
+        ->execute();
 
-    $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
-    $giftAidBatchNameParams = [
-      'option_group_id' => $optionGroupID,
-      'value' => $this->batchName,
-      'label' => $this->batchTitle,
-      'name' => $this->batchName,
-    ];
-    civicrm_api3('OptionValue', 'create', $giftAidBatchNameParams);
+      // Save current settings for the batch
+      CRM_Civigiftaid_BAO_BatchSettings::create(['batch_id' => $createdBatch['id']]);
 
-    list($total, $addedContributionIDs, $notAddedContributionIDs) =
-      CRM_Civigiftaid_Utils_Contribution::addContributionToBatch($contributionIDsToAdd, $createdBatch['id']);
+      OptionValue::create(FALSE)
+        ->addValue('option_group_id:name', 'giftaid_batch_name')
+        ->addValue('value', $this->batchName)
+        ->addValue('label', $this->batchTitle)
+        ->addValue('name', $this->batchName)
+        ->execute();
 
-    if (count($addedContributionIDs) === 0) {
-      // rollback since there were no contributions added, and we might not want to keep an empty batch
-      $transaction->rollback();
-      $statusType = 'alert';
-      $statusMessage = E::ts(
-        'Could not create batch "%1", as there were no valid contribution(s) to be added.',
-        [1 => $batchParams['title']]
-      );
-    }
-    else {
-      $statusType = 'success';
-      $statusMessage = [
-        E::ts('Added Contribution(s) to %1', [1 => $batchParams['title']]),
-      ];
-      $statusMessage[] = E::ts('Contribution IDs added to batch: %1', [1 => implode(', ', $addedContributionIDs)]);
-      if (!empty($notAddedContributionIDs)) {
-        $statusMessage[] = E::ts('Contribution IDs already in batch or not valid: %1', [1 => implode(', ', $notAddedContributionIDs)]);
+      list($total, $addedContributionIDs, $notAddedContributionIDs) =
+        CRM_Civigiftaid_Utils_Contribution::addContributionToBatch($contributionIDsToAdd, $createdBatch['id']);
+
+      if (count($addedContributionIDs) === 0) {
+        // rollback since there were no contributions added, and we might not want to keep an empty batch
+        $transaction->rollback();
+        $statusType = 'alert';
+        $statusMessage = E::ts(
+          'Could not create batch "%1", as there were no valid contribution(s) to be added.',
+          [1 => $batchParams['title']]
+        );
       }
-      $statusMessage = implode('<br/>', $statusMessage);
+      else {
+        $transaction->commit();
+        $statusType = 'success';
+        $statusMessage = [
+          E::ts('Added Contribution(s) to %1', [1 => $batchParams['title']]),
+        ];
+        $statusMessage[] = E::ts('Contribution IDs added to batch: %1', [1 => implode(', ', $addedContributionIDs)]);
+        if (!empty($notAddedContributionIDs)) {
+          $statusMessage[] = E::ts('Contribution IDs already in batch or not valid: %1', [1 => implode(', ', $notAddedContributionIDs)]);
+        }
+        $statusMessage = implode('<br/>', $statusMessage);
+      }
     }
-    $transaction->commit();
+    catch (\Exception $e) {
+      $transaction->rollback();
+      $statusMessage = E::ts('Error adding contributions to batch: %1', [1 => $e->getMessage()]);
+      $statusType = 'alert';
+    }
+
     CRM_Core_Session::setStatus($statusMessage, E::ts('Gift Aid'), $statusType, ['expires' => 0]);
   }
 

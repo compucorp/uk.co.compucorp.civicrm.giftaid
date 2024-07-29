@@ -9,6 +9,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\Batch;
 use Civi\Api4\Contribution;
 use Civi\Api4\EntityBatch;
 use CRM_Civigiftaid_ExtensionUtil as E;
@@ -34,7 +35,7 @@ class CRM_Civigiftaid_Utils_Contribution {
     $contributionsNotAdded = [];
 
     // Get the batch name
-    $batchName = \Civi\Api4\Batch::get(FALSE)
+    $batchName = Batch::get(FALSE)
       ->addSelect('name')
       ->addWhere('id', '=', $batchID)
       ->execute()
@@ -70,7 +71,6 @@ class CRM_Civigiftaid_Utils_Contribution {
       }
 
       if (!empty($contributionsAdded)) {
-        $transaction = new \CRM_Core_Transaction();
         try {
           // Create the batch records
           $entityBatch->execute();
@@ -81,7 +81,6 @@ class CRM_Civigiftaid_Utils_Contribution {
             ->execute();
         }
         catch (\Exception $e) {
-          $transaction->rollback();
           throw new CRM_Core_Exception('Error adding contributions from batch: ' . $e->getMessage());
         }
       }
@@ -163,18 +162,7 @@ class CRM_Civigiftaid_Utils_Contribution {
 
     foreach ($contributions as $contribution) {
       if (!empty($contribution['batch_id'])) {
-
         $contributionIDsToRemove[$contribution['contribution_id']] = $contribution['batch_id'];
-        $batchContribution = new CRM_Batch_DAO_EntityBatch();
-        $batchContribution->entity_table = 'civicrm_contribution';
-        $batchContribution->entity_id = $contribution['contribution_id'];
-        $batchContribution->batch_id = $contribution['batch_id'];
-        $batchContribution->delete();
-
-        Contribution::update(FALSE)
-          ->addWhere('id', '=', $contribution['contribution_id'])
-          ->addValue('gift_aid.batch_name', NULL)
-          ->execute();
         $contributionIDsRemoved[] = $contribution['contribution_id'];
       }
       else {
@@ -182,7 +170,6 @@ class CRM_Civigiftaid_Utils_Contribution {
       }
     }
     if (!empty($contributionIDsToRemove)) {
-      $transaction = new \CRM_Core_Transaction();
       try {
         // Delete the EntityBatch records
         EntityBatch::delete(FALSE)
@@ -197,10 +184,8 @@ class CRM_Civigiftaid_Utils_Contribution {
           ->execute();
       }
       catch (\Exception $e) {
-        $transaction->rollback();
         throw new CRM_Core_Exception('Error removing contributions from batch: ' . $e->getMessage());
       }
-      $transaction->commit();
     }
 
     return [

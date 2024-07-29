@@ -58,22 +58,30 @@ class CRM_Civigiftaid_Form_Task_RemoveFromBatch extends CRM_Contribute_Form_Task
 
     $transaction = new CRM_Core_Transaction();
 
-    list($total, $removedContributionIDs, $notRemovedContributionIDs) =
-      CRM_Civigiftaid_Utils_Contribution::removeContributionFromBatch($contributionIDsToRemove);
+    try {
+      list($total, $removedContributionIDs, $notRemovedContributionIDs) =
+        CRM_Civigiftaid_Utils_Contribution::removeContributionFromBatch($contributionIDsToRemove);
 
-    if (count($removedContributionIDs) === 0) {
-      $status = E::ts('Could not removed contribution from batch, as there were no valid contribution(s) to be removed.');
-    } else {
-      $transaction->commit();
-      $status = E::ts('Total Selected Contribution(s): %1', [1 => $total]);
-      CRM_Core_Session::setStatus($status);
+      if (count($removedContributionIDs) === 0) {
+        $transaction->rollback();
+        $status = E::ts('Could not remove contribution from batch, as there were no valid contribution(s) to be removed.');
+      }
+      else {
+        $transaction->commit();
+        $status = E::ts('Total Selected Contribution(s): %1', [1 => $total]);
+        CRM_Core_Session::setStatus($status);
 
-      if ($removedContributionIDs) {
-        $status = E::ts('Contribution IDs removed from batch: %1', [1 => implode(', ', $removedContributionIDs)]);
+        if ($removedContributionIDs) {
+          $status = E::ts('Contribution IDs removed from batch: %1', [1 => implode(', ', $removedContributionIDs)]);
+        }
+        if ($notRemovedContributionIDs) {
+          $status = E::ts('Contribution IDs not removed from batch: %1', [1 => implode(', ', $notRemovedContributionIDs)]);
+        }
       }
-      if ($notRemovedContributionIDs) {
-        $status = E::ts('Contribution IDs not removed from batch: %1', [1 => implode(', ', $notRemovedContributionIDs)]);
-      }
+    }
+    catch (\Exception $e) {
+      $transaction->rollback();
+      $status = E::ts('Error removing contributions from batch: %1', [1 => $e->getMessage()]);
     }
     CRM_Core_Session::setStatus($status);
   }
