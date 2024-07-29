@@ -9,6 +9,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\Batch;
 use Civi\Api4\OptionGroup;
 use Civi\Api4\OptionValue;
 use CRM_Civigiftaid_ExtensionUtil as E;
@@ -111,7 +112,7 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
     $transaction = new CRM_Core_Transaction();
 
     try {
-      $createdBatchID = \Civi\Api4\Batch::create(FALSE)
+      $createdBatchID = Batch::create(FALSE)
         ->addValue('title', $this->batchTitle)
         ->addValue('name', $this->batchName)
         ->addValue('description', $this->_submitValues['description'])
@@ -148,14 +149,11 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
       else {
         $transaction->commit();
         $statusType = 'success';
-        $statusMessage = [
-          E::ts('Added Contribution(s) to %1', [1 => $this->batchTitle]),
-        ];
-        $statusMessage[] = E::ts('Contribution IDs added to batch: %1', [1 => implode(', ', $addedContributionIDs)]);
+        $statusMessage = E::ts('Added %1 Contribution(s) to %2', [1 => count($addedContributionIDs), 2 => $this->batchTitle]);
+        \Civi::log('ukgiftaid')->debug(E::ts('Contribution IDs added to batch: %1', [1 => implode(', ', $addedContributionIDs)]));
         if (!empty($notAddedContributionIDs)) {
-          $statusMessage[] = E::ts('Contribution IDs already in batch or not valid: %1', [1 => implode(', ', $notAddedContributionIDs)]);
+          \Civi::log('ukgiftaid')->debug(E::ts('Contribution IDs already in batch or not valid: %1', [1 => implode(', ', $notAddedContributionIDs)]));
         }
-        $statusMessage = implode('<br/>', $statusMessage);
       }
     }
     catch (\Exception $e) {

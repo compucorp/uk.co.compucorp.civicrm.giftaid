@@ -69,20 +69,19 @@ class CRM_Civigiftaid_Utils_Contribution {
       else {
         $contributionsNotAdded[] = $contribution['id'];
       }
-
-      if (!empty($contributionsAdded)) {
-        try {
-          // Create the batch records
-          $entityBatch->execute();
-          // Add the batch name to the contribution
-          Contribution::update(FALSE)
-            ->addValue('gift_aid.batch_name:name', $batchName)
-            ->addWhere('id', 'IN', $contributionsAdded)
-            ->execute();
-        }
-        catch (\Exception $e) {
-          throw new CRM_Core_Exception('Error adding contributions from batch: ' . $e->getMessage());
-        }
+    }
+    if (!empty($contributionsAdded)) {
+      try {
+        // Create the batch records
+        $entityBatch->execute();
+        // Add the batch name to the contribution
+        Contribution::update(FALSE)
+          ->addValue('gift_aid.batch_name:name', $batchName)
+          ->addWhere('id', 'IN', $contributionsAdded)
+          ->execute();
+      }
+      catch (\Exception $e) {
+        throw new CRM_Core_Exception('Error adding contributions from batch: ' . $e->getMessage());
       }
     }
 
