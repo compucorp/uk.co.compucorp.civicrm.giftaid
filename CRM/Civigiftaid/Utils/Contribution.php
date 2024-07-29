@@ -381,8 +381,6 @@ class CRM_Civigiftaid_Utils_Contribution {
         && ($contribution['contribution_status_id'] == CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Completed'))
       ) {
         $contributionsAdded[] = $contribution['id'];
-        // Don't think we should be doing this in validate?
-        // self::updateGiftAidFields($contribution['id']);
       }
       else {
         $contributionsNotValid[] = $contribution['id'];
@@ -556,7 +554,6 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $contribution
    *
    * @return bool
-   * @throws \CRM_Core_Exception
    */
   public static function isEligibleForGiftAid($contribution) {
     $isContributionEligible = self::isContributionEligible($contribution);

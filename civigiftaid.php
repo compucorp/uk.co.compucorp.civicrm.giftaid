@@ -1,6 +1,8 @@
 <?php
 
 require_once 'civigiftaid.civix.php';
+
+use Civi\Api4\CustomGroup;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -146,11 +148,11 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   // Only for offline contribution
   $groupID = $form->getVar('_groupID');
   $contactID = $form->getVar('_entityId');
-  $customGroupTableName = civicrm_api3('CustomGroup', 'getvalue', [
-    'id' => $groupID,
-    'return' => 'table_name',
-  ]);
-
+  $customGroupTableName = CustomGroup::get(FALSE)
+    ->addSelect('table_name')
+    ->addWhere('id', '=', $groupID)
+    ->execute()
+    ->first()['table_name'];
   if ($customGroupTableName == 'civicrm_value_gift_aid_declaration') {
     $declarationUpdateParams = ['entity_id' => $contactID];
     CRM_Civigiftaid_Declaration::updateDeclarationAddress($declarationUpdateParams);
@@ -176,14 +178,12 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
       }
       // We have the batch ID. Check if it's a giftaid batch and delete related stuff
       try {
-        $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', [
-          'name' => 'giftaid_batch_name',
-          'return' => 'id'
-        ]);
-        $batchOptionValue = civicrm_api3('OptionValue', 'getsingle', [
-          'option_group_id' => $optionGroupID,
-          'value' => $objectId,
-        ]);
+        $batchOptionValue = \Civi\Api4\OptionValue::get(FALSE)
+          ->addSelect('id', 'name')
+          ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+          ->addWhere('value', '=', $objectId)
+          ->execute()
+          ->first();
         // Clear batch_name from contributions
         $updateSql = "UPDATE civicrm_value_gift_aid_submission SET batch_name = NULL WHERE batch_name=%1";
         $updateSqlParams = [
@@ -191,12 +191,11 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
         ];
         CRM_Core_DAO::executeQuery($updateSql, $updateSqlParams);
         // Finally we delete the giftaid batch name option value.
-        civicrm_api3('OptionValue', 'delete', [
-          'id' => $batchOptionValue['id'],
-        ]);
+        \Civi\Api4\OptionValue::delete(FALSE)
+          ->addWhere('id', '=', $batchOptionValue['id'])
+          ->execute();
       } catch (Exception $e) {
-        \Civi::log()
-          ->error('Deleting Gift Aid Batch failed: ' . $e->getMessage());
+        \Civi::log()->error('Deleting Gift Aid Batch failed: ' . $e->getMessage());
       }
       break;
 
@@ -249,7 +248,7 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
   if ($formName == 'CRM_Contact_Form_CustomData') {
     $groupID = $form->getVar('_groupID');
     $contactID = $form->getVar('_entityId');
-    $tableName = \Civi\Api4\CustomGroup::get(FALSE)
+    $tableName = CustomGroup::get(FALSE)
       ->addSelect('table_name')
       ->addWhere('id', '=', $groupID)
       ->execute()
