@@ -249,24 +249,25 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
   if ($formName == 'CRM_Contact_Form_CustomData') {
     $groupID = $form->getVar('_groupID');
     $contactID = $form->getVar('_entityId');
-    $tableName = civicrm_api3('CustomGroup', 'getvalue', [
-      'return' => 'table_name',
-      'id' => $groupID,
-    ]);
+    $tableName = \Civi\Api4\CustomGroup::get(FALSE)
+      ->addSelect('table_name')
+      ->addWhere('id', '=', $groupID)
+      ->execute()
+      ->first()['table_name'];
 
     if ($tableName == 'civicrm_value_gift_aid_declaration') {
       // Assemble multi-value field values from custom_X_Y into
       // array $declarations of sets of values as column_name => value
-      $columnNames = civicrm_api3('CustomField', 'get', [
-        'return' => ["column_name"],
-        'custom_group_id' => $groupID,
-      ]);
-      $columnNames = CRM_Utils_Array::collect('column_name', CRM_Utils_Array::value('values', $columnNames));
+      $columnNames = \Civi\Api4\CustomField::get(FALSE)
+        ->addSelect('column_name')
+        ->addWhere('custom_group_id', '=', $groupID)
+        ->execute()
+        ->column('column_name');
 
       $declarations = [];
       foreach ($fields as $name => $value) {
         if (preg_match('/^custom_(\d+)_(-?\d+)$/', $name, $matches)) {
-          $columnName = CRM_Utils_Array::value($matches[1], $columnNames);
+          $columnName = $columnNames[$matches[1]] ?? NULL;
           if ($columnName) {
             $declarations[$matches[2]][$columnName]['value'] = $value;
             $declarations[$matches[2]][$columnName]['name'] = $name;
