@@ -82,36 +82,48 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
       ]
     ]);
 
-    if (isset($contribution[$contributionEligibleGiftAidFieldName]) && ($contribution[$contributionEligibleGiftAidFieldName] !== '')) {
-      $eligibility = (int) $contribution[$contributionEligibleGiftAidFieldName];
+    if (!empty($contribution[$contributionBatchNameFieldName])) {
+      // If contribution is already in a batch don't touch!
+      return (bool) $contribution[$contributionEligibleGiftAidFieldName];
     }
-    // If the "Eligible for gift-aid" field is already set don't try to set it.
-    if (!isset($eligibility)) {
-      // We need to set the Eligible for gift-aid field.
-      $allFinancialTypesEnabled = (bool) \Civi::settings()->get('civigiftaid_globally_enabled');
 
-      if ($allFinancialTypesEnabled) {
-        $eligibility = 1;
-      }
-      else {
-        // Assume not eligible until proven eligible.
-        $eligibility = 0;
-        // We need to look through line items to determine if any of them are eligible.
-        if (empty($contribution['line_items'])) {
-          // Issue #9: Sometimes line_itmes are not returned!
-          if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
-            $eligibility = 1;
-          }
+    // If unset, eligibility field is NULL or '' so we should calculate
+    // If set to 1 we recalculate (you can't force it to be eligible)
+    // If set to 0 we accept user choice to set it as "not eligible"
+    $eligibility = $contribution[$contributionEligibleGiftAidFieldName];
+    switch ($eligibility) {
+      case 0:
+        return FALSE;
+
+      case NULL:
+      case '':
+      case 1:
+      default:
+        // We need to set the Eligible for gift-aid field.
+        $allFinancialTypesEnabled = (bool) \Civi::settings()->get('civigiftaid_globally_enabled');
+
+        if ($allFinancialTypesEnabled) {
+          $eligibility = 1;
         }
         else {
-          foreach ($contribution['line_items'] as $lineItem) {
-            if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
+          // Assume not eligible until proven eligible.
+          $eligibility = 0;
+          // We need to look through line items to determine if any of them are eligible.
+          if (empty($contribution['line_items'])) {
+            // Issue #9: Sometimes line_itmes are not returned!
+            if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
               $eligibility = 1;
-              break;
+            }
+          }
+          else {
+            foreach ($contribution['line_items'] as $lineItem) {
+              if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
+                $eligibility = 1;
+                break;
+              }
             }
           }
         }
-      }
     }
 
     // Now update the giftaid fields on the contribution and (re-)do calculations for amounts.
