@@ -95,19 +95,8 @@ class UpdateGiftAidTest extends \PHPUnit\Framework\TestCase implements HeadlessI
     ->execute();
 
     $now = $this->fetchCn($donationSimple['id']);
-    // At this point we expect that while it's eligible, the amounts are zero because the line items are not eligible
-    $this->assertEquals(1, $now['gift_aid.eligible_for_gift_aid']);
-    $this->assertEquals(0, $now['gift_aid.amount']);
-    $this->assertEquals(0, $now['gift_aid.gift_aid_amount']);
-
-    // Test our code.
-    // Check that the contribution is set back ineligible by UpdateGiftAid
-    $result = Contribution::UpdateGiftAid(FALSE)->addWhere('id', '=', $donationSimple['id'])->execute()->getArrayCopy();
-    $this->assertCount(1, $result);
-    $this->assertEquals($donationSimple['id'], $result[0]['id']);
-    $this->assertEquals(0, $result[0]['gift_aid.eligible_for_gift_aid']);
-
-    $now = $this->fetchCn($donationSimple['id']);
+    // When we update the contribution it will automatically recalculate the amounts and set eligibility to 0 if
+    //   the amounts are 0.
     $this->assertEquals(0, $now['gift_aid.eligible_for_gift_aid']);
     $this->assertEquals(0, $now['gift_aid.amount']);
     $this->assertEquals(0, $now['gift_aid.gift_aid_amount']);

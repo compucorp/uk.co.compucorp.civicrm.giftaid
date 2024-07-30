@@ -762,12 +762,12 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
         [
           'expectedEligibility' => TRUE,
           'receive_date' => '2020-01-01 00:00:00',
-          'total_amount' => 0,
+          'total_amount' => 1,
           'line_items' => [
             [
               'line_item' => [
                 [
-                  'line_total' => 0,
+                  'line_total' => 1,
                   'financial_type_id' => 1,
                   'price_field_id' => 1,
                   'qty' => 1
@@ -798,12 +798,12 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
         [
           'expectedEligibility' => TRUE,
           'receive_date' => '2019-01-01 00:00:00',
-          'total_amount' => 0,
+          'total_amount' => 1,
           'line_items' => [
             [
               'line_item' => [
                 [
-                  'line_total' => 0,
+                  'line_total' => 1,
                   'financial_type_id' => 1,
                   'price_field_id' => 1,
                   'qty' => 1
