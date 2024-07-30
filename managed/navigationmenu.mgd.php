@@ -1,6 +1,6 @@
 <?php
 
-use CRM_Giftaidonline_ExtensionUtil as E;
+use CRM_Civigiftaid_ExtensionUtil as E;
 
 return [
   [
