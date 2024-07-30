@@ -9,6 +9,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\CustomGroup;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -81,36 +82,48 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
       ]
     ]);
 
-    if (isset($contribution[$contributionEligibleGiftAidFieldName]) && ($contribution[$contributionEligibleGiftAidFieldName] !== '')) {
-      $eligibility = (int) $contribution[$contributionEligibleGiftAidFieldName];
+    if (!empty($contribution[$contributionBatchNameFieldName])) {
+      // If contribution is already in a batch don't touch!
+      return (bool) $contribution[$contributionEligibleGiftAidFieldName];
     }
-    // If the "Eligible for gift-aid" field is already set don't try to set it.
-    if (!isset($eligibility)) {
-      // We need to set the Eligible for gift-aid field.
-      $allFinancialTypesEnabled = (bool) \Civi::settings()->get('civigiftaid_globally_enabled');
 
-      if ($allFinancialTypesEnabled) {
-        $eligibility = 1;
-      }
-      else {
-        // Assume not eligible until proven eligible.
-        $eligibility = 0;
-        // We need to look through line items to determine if any of them are eligible.
-        if (empty($contribution['line_items'])) {
-          // Issue #9: Sometimes line_itmes are not returned!
-          if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
-            $eligibility = 1;
-          }
+    // If unset, eligibility field is NULL or '' so we should calculate
+    // If set to 1 we recalculate (you can't force it to be eligible)
+    // If set to 0 we accept user choice to set it as "not eligible"
+    $eligibility = $contribution[$contributionEligibleGiftAidFieldName];
+    switch ($eligibility) {
+      case 0:
+        return FALSE;
+
+      case NULL:
+      case '':
+      case 1:
+      default:
+        // We need to set the Eligible for gift-aid field.
+        $allFinancialTypesEnabled = (bool) \Civi::settings()->get('civigiftaid_globally_enabled');
+
+        if ($allFinancialTypesEnabled) {
+          $eligibility = 1;
         }
         else {
-          foreach ($contribution['line_items'] as $lineItem) {
-            if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
+          // Assume not eligible until proven eligible.
+          $eligibility = 0;
+          // We need to look through line items to determine if any of them are eligible.
+          if (empty($contribution['line_items'])) {
+            // Issue #9: Sometimes line_itmes are not returned!
+            if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
               $eligibility = 1;
-              break;
+            }
+          }
+          else {
+            foreach ($contribution['line_items'] as $lineItem) {
+              if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
+                $eligibility = 1;
+                break;
+              }
             }
           }
         }
-      }
     }
 
     // Now update the giftaid fields on the contribution and (re-)do calculations for amounts.
@@ -137,7 +150,11 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    *
    */
   private static function getMissingGiftAidDeclarationMessage($contactId) {
-    $giftAidDeclarationGroupId = self::getGiftAidDeclarationGroupId();
+    $giftAidDeclarationGroupId = CustomGroup::get(FALSE)
+      ->addSelect('id')
+      ->addWhere('name', '=', 'gift_aid_declaration')
+      ->execute()
+      ->first()['id'];
     $selectedTab = 'custom_' . $giftAidDeclarationGroupId;
     $link = CRM_Utils_System::url(
       'civicrm/contact/view',
@@ -153,24 +170,6 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
     return E::ts("This contribution has been automatically marked as Eligible for Gift Aid.
       This is because the administrator has indicated that it's financial type is Eligible for Gift Aid.
       However this contact does not have a valid Gift Aid Declaration. You can add one of these %1.", [1 => $link]);
-  }
-
-  /**
-   * Returns the gift aid declaration custom group Id.
-   *
-   * @return int
-   *   Custom group Id.
-   */
-  private static function getGiftAidDeclarationGroupId() {
-    try {
-      $customGroup = civicrm_api3('CustomGroup', 'getsingle', [
-        'return' => ['id'],
-        'name' => 'gift_aid_declaration',
-      ]);
-
-      return $customGroup['id'];
-    }
-    catch (Exception $e) {}
   }
 
   /**

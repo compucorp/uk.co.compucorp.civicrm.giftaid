@@ -9,7 +9,9 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Api4\Batch;
 use Civi\Api4\Contribution;
+use Civi\Api4\EntityBatch;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -28,21 +30,23 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @throws \CRM_Extension_Exception
    * @throws \CRM_Core_Exception
    */
-  public static function addContributionToBatch($contributionIDs, $batchID) {
+  public static function addContributionToBatch(array $contributionIDs, int $batchID): array {
     $contributionsAdded = [];
     $contributionsNotAdded = [];
 
     // Get the batch name
-    $batchName = civicrm_api3('Batch', 'getvalue', [
-      'return' => 'name',
-      'id' => $batchID,
-    ]);
+    $batchName = Batch::get(FALSE)
+      ->addSelect('name')
+      ->addWhere('id', '=', $batchID)
+      ->execute()
+      ->first()['name'];
 
     // Get all contributions from found IDs that are not already in a batch
     $contributions = Contribution::get(FALSE)
       ->addWhere('id', 'IN', $contributionIDs)
       ->addSelect('*', 'custom.*')
       ->execute();
+    $entityBatch = EntityBatch::save(FALSE);
     foreach ($contributions as $contribution) {
       // check if the selected contribution id already in a batch
       if (!empty($contribution['gift_aid.batch_name'])) {
@@ -54,13 +58,11 @@ class CRM_Civigiftaid_Utils_Contribution {
       if (self::isEligibleForGiftAid($contribution)
         && ($contribution['contribution_status_id'] == CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Completed'))
       ) {
-        civicrm_api3('EntityBatch', 'create', [
+        $entityBatch->addRecord([
+          'entity_table' => 'civicrm_contribution',
           'entity_id' => $contribution['id'],
           'batch_id' => $batchID,
-          'entity_table' => 'civicrm_contribution',
         ]);
-
-        self::updateGiftAidFields($contribution['id'], NULL, $batchName, $addToBatch = TRUE);
 
         $contributionsAdded[] = $contribution['id'];
       }
@@ -68,14 +70,25 @@ class CRM_Civigiftaid_Utils_Contribution {
         $contributionsNotAdded[] = $contribution['id'];
       }
     }
+    if (!empty($contributionsAdded)) {
+      try {
+        // Create the batch records
+        $entityBatch->execute();
+        // Add the batch name to the contribution
+        Contribution::update(FALSE)
+          ->addValue('gift_aid.batch_name:name', $batchName)
+          ->addWhere('id', 'IN', $contributionsAdded)
+          ->execute();
+      }
+      catch (\Exception $e) {
+        throw new CRM_Core_Exception('Error adding contributions from batch: ' . $e->getMessage());
+      }
+    }
 
     if (!empty($contributionsAdded)) {
       // if there is any extra work required to be done for contributions that are batched,
       // should be done via hook
-      CRM_Civigiftaid_Utils_Hook::batchContributions(
-        $batchID,
-        $contributionsAdded
-      );
+      CRM_Civigiftaid_Utils_Hook::batchContributions($batchID, $contributionsAdded);
     }
 
     return [
@@ -98,6 +111,7 @@ class CRM_Civigiftaid_Utils_Contribution {
     if (!empty($batchName) && !$updateIfHasBatchName) {
       // Don't touch this contribution - it's already part of a batch
       // and we're not being called to clear the batch (e.g. new contribution in a recurring contribution).
+      \Civi::log()->warning('Civigiftaid: Attempted to change batch name!');
       return;
     }
 
@@ -106,10 +120,9 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
     if (isset($eligibleForGiftAid)) {
       $eligibleForGiftAid = (int) $eligibleForGiftAid;
-      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
       if ($eligibleForGiftAid === 0) {
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = NULL;
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = NULL;
+        $giftAidAmount = 0;
+        $giftAidableContribAmt = 0;
       }
       else {
         // Eligible - calculate gift aid amounts
@@ -119,9 +132,14 @@ class CRM_Civigiftaid_Utils_Contribution {
           ->first()['total_amount'];
         $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
         $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = $giftAidAmount;
-        $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = $giftAidableContribAmt;
+        if ((bccomp($giftAidAmount, 0.0, 1) === 0) && (bccomp($giftAidableContribAmt, 0.0, 1) === 0)) {
+          // If we don't have an enabled financialType contribution is not eligible
+          $eligibleForGiftAid = 0;
+        }
       }
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid')] = $giftAidAmount;
+      $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid')] = $giftAidableContribAmt;
     }
     $contributionParams['entity_id'] = $contributionID;
     // We use CustomValue.create instead of Contribution.create because Contribution.create is way too slow
@@ -144,23 +162,32 @@ class CRM_Civigiftaid_Utils_Contribution {
 
     $contributions = self::getContributionDetails($contributionsIDsToRemove);
 
+
     foreach ($contributions as $contribution) {
       if (!empty($contribution['batch_id'])) {
-
-        $batchContribution = new CRM_Batch_DAO_EntityBatch();
-        $batchContribution->entity_table = 'civicrm_contribution';
-        $batchContribution->entity_id = $contribution['contribution_id'];
-        $batchContribution->batch_id = $contribution['batch_id'];
-        $batchContribution->delete();
-
-        Contribution::update(FALSE)
-          ->addWhere('id', '=', $contribution['contribution_id'])
-          ->addValue('gift_aid.batch_name', NULL)
-          ->execute();
+        $contributionIDsToRemove[$contribution['contribution_id']] = $contribution['batch_id'];
         $contributionIDsRemoved[] = $contribution['contribution_id'];
       }
       else {
         $contributionIDsNotRemoved[] = $contribution['contribution_id'];
+      }
+    }
+    if (!empty($contributionIDsToRemove)) {
+      try {
+        // Delete the EntityBatch records
+        EntityBatch::delete(FALSE)
+          ->addWhere('entity_table', '=', 'civicrm_contribution')
+          ->addWhere('entity_id', 'IN', array_keys($contributionIDsToRemove))
+          ->addWhere('batch_id', 'IN', $contributionIDsToRemove)
+          ->execute();
+        // Delete the Contribution batch name
+        Contribution::update(FALSE)
+          ->addWhere('id', 'IN', array_keys($contributionIDsToRemove))
+          ->addValue('gift_aid.batch_name', NULL)
+          ->execute();
+      }
+      catch (\Exception $e) {
+        throw new CRM_Core_Exception('Error removing contributions from batch: ' . $e->getMessage());
       }
     }
 
@@ -331,7 +358,7 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @throws \CRM_Extension_Exception
    * @throws \CRM_Core_Exception
    */
-  public static function validateContributionToBatch($contributionIDs) {
+  public static function validateContributionToBatch(array $contributionIDs): array {
     $contributionsAdded = [];
     $contributionsAlreadyAdded = [];
 
@@ -341,11 +368,10 @@ class CRM_Civigiftaid_Utils_Contribution {
       ->addWhere('id', 'IN', $contributionIDs)
       ->addWhere('receive_date', '<=', 'now')
       ->execute()
-      ->indexBy('id')
-      ->getArrayCopy();
+      ->indexBy('id');
 
     // Add contribution IDs that were not matched (eg. receive_date is in the future)
-    $contributionsNotValid = array_diff($contributionIDs, array_keys($contributions));
+    $contributionsNotValid = array_diff($contributionIDs, array_keys($contributions->getArrayCopy()));
 
     foreach ($contributions as $contribution) {
       if (!empty($contribution['gift_aid.batch_name'])) {
@@ -355,7 +381,6 @@ class CRM_Civigiftaid_Utils_Contribution {
         && ($contribution['contribution_status_id'] == CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Completed'))
       ) {
         $contributionsAdded[] = $contribution['id'];
-        self::updateGiftAidFields($contribution['id']);
       }
       else {
         $contributionsNotValid[] = $contribution['id'];
@@ -411,9 +436,9 @@ class CRM_Civigiftaid_Utils_Contribution {
    *
    * @param int $pBatchId a batchId
    *
-   * @return true if already submitted and if not
+   * @return bool true if already submitted and false if not
    */
-  public static function isBatchAlreadySubmitted($pBatchId) {
+  public static function isBatchAlreadySubmitted(int $pBatchId): bool {
     if (!self::isOnlineSubmissionExtensionInstalled()) {
       return FALSE;
     }
@@ -421,30 +446,6 @@ class CRM_Civigiftaid_Utils_Contribution {
     $onlineSubmission = new CRM_Giftaidonline_Page_OnlineSubmission();
     $bIsSubmitted = $onlineSubmission->is_submitted($pBatchId);
     return $bIsSubmitted;
-  }
-
-  /**
-   * @param string $entityTable Entity table name
-   *
-   * @return string
-   */
-  public static function getLineItemName($entityTable) {
-    switch ($entityTable) {
-      case 'civicrm_participant':
-        return 'Event';
-
-      case 'civicrm_membership':
-        return 'Membership';
-
-      case 'civicrm_contribution':
-        return 'Donation';
-
-      case 'civicrm_participation':
-        return 'Participation';
-
-      default:
-        return $entityTable;
-    }
   }
 
   /**
@@ -553,7 +554,6 @@ class CRM_Civigiftaid_Utils_Contribution {
    * @param array $contribution
    *
    * @return bool
-   * @throws \CRM_Core_Exception
    */
   public static function isEligibleForGiftAid($contribution) {
     $isContributionEligible = self::isContributionEligible($contribution);

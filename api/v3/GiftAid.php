@@ -164,7 +164,15 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   if (!empty($params['contribution_id'])) {
     $contributions->addWhere('id', '=', $params['contribution_id']);
   }
-  $contributionsResult = $contributions->execute()->indexBy('id');
+
+  // Batch name
+  if (!empty($params['batch_name'])) {
+    $contributions->addWhere('gift_aid.batch_name', '=', $params['batch_name']);
+  }
+  else {
+    $contributions->addClause('OR', ['gift_aid.batch_name', 'IS NULL'], ['gift_aid.batch_name', 'IS EMPTY']);
+  }
+  $contributionsResult = $contributions->execute();
   if ($contributionsResult->count() < 1) {
     return civicrm_api3_create_error('No contributions found or none have Eligible flag set!');
   }
@@ -180,22 +188,14 @@ function civicrm_api3_gift_aid_recalculatecontributionamounts($params) {
   }
 
   try {
-    foreach ($contributionsResult as $contributionID => $contributionDetail) {
-      // Check batch name here because it may be NULL or empty string and we can't check that using API3.
-      if (!empty($params['batch_name']) && ($params['batch_name'] !== $contributionDetail['gift_aid.batch_name'])) {
-        // We specified a specific batch name to process and this contribution is not part of that batch
-        continue;
-      }
-      elseif (empty($params['batch_name']) && !empty($contributionDetail['gift_aid.batch_name'])) {
-        // Contribution is part of a batch so we must not change/process it.
-        continue;
-      }
-      CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID,
+    foreach ($contributionsResult as $contributionDetail) {
+      CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields(
+        $contributionDetail['id'],
         $contributionDetail['gift_aid.eligible_for_gift_aid'],
         $contributionDetail['gift_aid.batch_name'],
         TRUE
       );
-      $updatedIDs[] = $contributionID;
+      $updatedIDs[] = $contributionDetail['id'];
     }
   }
   finally {

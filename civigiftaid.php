@@ -1,6 +1,8 @@
 <?php
 
 require_once 'civigiftaid.civix.php';
+
+use Civi\Api4\CustomGroup;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
@@ -146,11 +148,11 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   // Only for offline contribution
   $groupID = $form->getVar('_groupID');
   $contactID = $form->getVar('_entityId');
-  $customGroupTableName = civicrm_api3('CustomGroup', 'getvalue', [
-    'id' => $groupID,
-    'return' => 'table_name',
-  ]);
-
+  $customGroupTableName = CustomGroup::get(FALSE)
+    ->addSelect('table_name')
+    ->addWhere('id', '=', $groupID)
+    ->execute()
+    ->first()['table_name'];
   if ($customGroupTableName == 'civicrm_value_gift_aid_declaration') {
     $declarationUpdateParams = ['entity_id' => $contactID];
     CRM_Civigiftaid_Declaration::updateDeclarationAddress($declarationUpdateParams);
@@ -176,14 +178,12 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
       }
       // We have the batch ID. Check if it's a giftaid batch and delete related stuff
       try {
-        $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', [
-          'name' => 'giftaid_batch_name',
-          'return' => 'id'
-        ]);
-        $batchOptionValue = civicrm_api3('OptionValue', 'getsingle', [
-          'option_group_id' => $optionGroupID,
-          'value' => $objectId,
-        ]);
+        $batchOptionValue = \Civi\Api4\OptionValue::get(FALSE)
+          ->addSelect('id', 'name')
+          ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+          ->addWhere('value', '=', $objectId)
+          ->execute()
+          ->first();
         // Clear batch_name from contributions
         $updateSql = "UPDATE civicrm_value_gift_aid_submission SET batch_name = NULL WHERE batch_name=%1";
         $updateSqlParams = [
@@ -191,12 +191,11 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
         ];
         CRM_Core_DAO::executeQuery($updateSql, $updateSqlParams);
         // Finally we delete the giftaid batch name option value.
-        civicrm_api3('OptionValue', 'delete', [
-          'id' => $batchOptionValue['id'],
-        ]);
+        \Civi\Api4\OptionValue::delete(FALSE)
+          ->addWhere('id', '=', $batchOptionValue['id'])
+          ->execute();
       } catch (Exception $e) {
-        \Civi::log()
-          ->error('Deleting Gift Aid Batch failed: ' . $e->getMessage());
+        \Civi::log()->error('Deleting Gift Aid Batch failed: ' . $e->getMessage());
       }
       break;
 
@@ -249,24 +248,25 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
   if ($formName == 'CRM_Contact_Form_CustomData') {
     $groupID = $form->getVar('_groupID');
     $contactID = $form->getVar('_entityId');
-    $tableName = civicrm_api3('CustomGroup', 'getvalue', [
-      'return' => 'table_name',
-      'id' => $groupID,
-    ]);
+    $tableName = CustomGroup::get(FALSE)
+      ->addSelect('table_name')
+      ->addWhere('id', '=', $groupID)
+      ->execute()
+      ->first()['table_name'];
 
     if ($tableName == 'civicrm_value_gift_aid_declaration') {
       // Assemble multi-value field values from custom_X_Y into
       // array $declarations of sets of values as column_name => value
-      $columnNames = civicrm_api3('CustomField', 'get', [
-        'return' => ["column_name"],
-        'custom_group_id' => $groupID,
-      ]);
-      $columnNames = CRM_Utils_Array::collect('column_name', CRM_Utils_Array::value('values', $columnNames));
+      $columnNames = \Civi\Api4\CustomField::get(FALSE)
+        ->addSelect('column_name')
+        ->addWhere('custom_group_id', '=', $groupID)
+        ->execute()
+        ->column('column_name');
 
       $declarations = [];
       foreach ($fields as $name => $value) {
         if (preg_match('/^custom_(\d+)_(-?\d+)$/', $name, $matches)) {
-          $columnName = CRM_Utils_Array::value($matches[1], $columnNames);
+          $columnName = $columnNames[$matches[1]] ?? NULL;
           if ($columnName) {
             $declarations[$matches[2]][$columnName]['value'] = $value;
             $declarations[$matches[2]][$columnName]['name'] = $name;
@@ -351,12 +351,23 @@ function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value
   // Gift Aid batch name is stored as "name" but we want to display "label".
   if ($fieldInfo['name'] === 'batch_name' && $fieldInfo['column_name'] === 'batch_name' && !empty($value)) {
     try {
-      $optionGroupID = civicrm_api3('OptionGroup', 'getvalue', ['name' => 'giftaid_batch_name', 'return' => 'id']);
-      $displayValue = civicrm_api3('OptionValue', 'getvalue', [
-        'option_group_id' => $optionGroupID,
-        'name' => $value,
-        'return' => 'label',
-      ]);
+      if (is_array($value)) {
+        $displayValues = \Civi\Api4\OptionValue::get(FALSE)
+          ->addSelect('label')
+          ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+          ->addWhere('name', 'IN', $value)
+          ->execute()
+          ->column('label');
+        $displayValue = implode(', ', $displayValues);
+      }
+      else {
+        $displayValue = \Civi\Api4\OptionValue::get(FALSE)
+          ->addSelect('label')
+          ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+          ->addWhere('name', '=', $value)
+          ->execute()
+          ->first()['label'];
+      }
     }
     catch (Exception $e) {
       // Do nothing, we'll use the existing displayValue

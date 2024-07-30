@@ -353,8 +353,8 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
     $this->formatDisplay($rows);
 
     // assign variables to templates
-    $this->assign_by_ref('columnHeaders', $this->_columnHeaders);
-    $this->assign_by_ref('rows', $rows);
+    $this->assign('columnHeaders', $this->_columnHeaders);
+    $this->assign('rows', $rows);
 
     // do print / pdf / instance stuff if needed
     $this->endPostProcess($rows);

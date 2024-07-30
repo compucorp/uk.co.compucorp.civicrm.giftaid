@@ -1,1 +1,0 @@
-<xi:include href="CRM/Civigiftaid/files.xml"         parse="xml" />
