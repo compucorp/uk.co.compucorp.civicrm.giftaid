@@ -132,7 +132,7 @@ class CRM_Civigiftaid_Utils_Contribution {
           ->first()['total_amount'];
         $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
         $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
-        if ($giftAidAmount === 0 && $giftAidableContribAmt === 0) {
+        if ((bccomp($giftAidAmount, 0.0, 1) === 0) && (bccomp($giftAidableContribAmt, 0.0, 1) === 0)) {
           // If we don't have an enabled financialType contribution is not eligible
           $eligibleForGiftAid = 0;
         }
