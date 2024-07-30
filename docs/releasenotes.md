@@ -9,6 +9,17 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.6 (2024-07-30)
+
+* If contribution eligible amount is 0 we force contribution eligibility to "No".
+* Performance improvements.
+* Various internal code improvements (move to API4, remove legacy code etc.).
+* Add composer.json.
+* Smarty3+ compatibility.
+* PHP8 fixes.
+* Add upgrade for historical batches.
+* Save batch name instead of id in value.
+
 ## Release 3.5.3 (2023-07-31)
 
 * [!36](https://lab.civicrm.org/extensions/ukgiftaid/-/merge_requests/36) Add route for contribution tasks so they can be used with searchkit.

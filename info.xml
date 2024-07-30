@@ -18,11 +18,11 @@
     <author>MJW Consulting, Rich Lott (Artful Robot) Erawat Chamanont, Jamie Novick, Guanhuan Chen, Robin Mitra</author>
     <email>mjw@mjwconsult.co.uk, https://artfulrobot.uk, jamie@compucorp.co.uk, guanhuan@compucorp.co.uk</email>
   </maintainer>
-  <releaseDate>2024-05-20</releaseDate>
+  <releaseDate>2024-07-30</releaseDate>
   <version>3.6</version>
   <develStage>stable</develStage>
   <compatibility>
-    <ver>5.68</ver>
+    <ver>5.74</ver>
   </compatibility>
   <civix>
     <namespace>CRM/Civigiftaid</namespace>
