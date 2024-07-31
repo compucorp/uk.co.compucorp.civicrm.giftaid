@@ -72,10 +72,6 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
   }
 
   public function buildQuickForm() {
-    if ($this->controller instanceof CRM_Contribute_Controller_Search && $this->isSubmitted()) {
-      return;
-    }
-
     $attributes = CRM_Core_DAO::getAttribute('CRM_Batch_DAO_Batch');
     $this->add('text', 'title', E::ts('Batch Title'), $attributes['title'], TRUE);
 
