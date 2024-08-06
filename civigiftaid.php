@@ -32,44 +32,10 @@ function civigiftaid_civicrm_install() {
 }
 
 /**
- * Implementation of hook_civicrm_postInstall
- */
-function civigiftaid_civicrm_postInstall() {
-  _civigiftaid_civix_civicrm_postInstall();
-}
-
-/**
- * Implementation of hook_civicrm_uninstall
- */
-function civigiftaid_civicrm_uninstall() {
-  _civigiftaid_civix_civicrm_uninstall();
-}
-
-/**
  * Implementation of hook_civicrm_enable
  */
 function civigiftaid_civicrm_enable() {
   _civigiftaid_civix_civicrm_enable();
-}
-
-/**
- * Implementation of hook_civicrm_disable
- */
-function civigiftaid_civicrm_disable() {
-  _civigiftaid_civix_civicrm_disable();
-}
-
-/**
- * Implementation of hook_civicrm_upgrade
- *
- * @param $op    string, the type of operation being performed; 'check' or 'enqueue'
- * @param $queue CRM_Queue_Queue, (for 'enqueue') the modifiable list of pending up upgrade tasks
- *
- * @return mixed  based on op. for 'check', returns array(boolean) (TRUE if upgrades are pending)
- *                for 'enqueue', returns void
- */
-function civigiftaid_civicrm_upgrade($op, CRM_Queue_Queue $queue = NULL) {
-  return _civigiftaid_civix_civicrm_upgrade($op, $queue);
 }
 
 /**
@@ -452,13 +418,4 @@ function civigiftaid_civicrm_customFieldOptions($fieldID, &$options, $detailedFo
 
     $options = array_combine(array_column($optionValues, 'name'), array_column($optionValues, 'label'));
   }
-}
-
-/**
- * Implements hook_civicrm_entityTypes().
- *
- * @link https://docs.civicrm.org/dev/en/latest/hooks/hook_civicrm_entityTypes
- */
-function civigiftaid_civicrm_entityTypes(&$entityTypes) {
-  _civigiftaid_civix_civicrm_entityTypes($entityTypes);
 }
