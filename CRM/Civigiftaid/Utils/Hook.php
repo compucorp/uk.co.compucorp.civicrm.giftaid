@@ -41,7 +41,7 @@ abstract class CRM_Civigiftaid_Utils_Hook extends CRM_Utils_Hook {
    *
    * @return mixed
    */
-  public static function batchContributions($batchID, $contributionsAdded) {
+  public static function batchContributions($batchID, &$contributionsAdded) {
     return self::singleton()->invoke(['batchID', 'contributionsAdded'], $batchID, $contributionsAdded, self::$_nullObject, self::$_nullObject, self::$_nullObject, self::$_nullObject, 'civicrm_batchContributions');
   }
 
