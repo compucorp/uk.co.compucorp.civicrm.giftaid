@@ -10,17 +10,6 @@ use CRM_Civigiftaid_ExtensionUtil as E;
  */
 function civigiftaid_civicrm_config(&$config) {
   _civigiftaid_civix_civicrm_config($config);
-
-  if (isset(Civi::$statics[__FUNCTION__])) { return; }
-  Civi::$statics[__FUNCTION__] = 1;
-
-  // Symfony hook priorities - see https://docs.civicrm.org/dev/en/latest/hooks/usage/symfony/#priorities
-  // Add listeners for CiviCRM hooks that might need altering by other scripts
-  Civi::dispatcher()->addListener('hook_civicrm_postCommit', 'CRM_Civigiftaid_SetContributionGiftAidEligibility::runCallback');
-
-  // Run before giftaidonline (-100)
-  \Civi::dispatcher()->addListener('hook_civicrm_navigationMenu', 'civigiftaid_symfony_civicrm_navigationMenu', 0);
-
 }
 
 /**
@@ -35,38 +24,6 @@ function civigiftaid_civicrm_install() {
  */
 function civigiftaid_civicrm_enable() {
   _civigiftaid_civix_civicrm_enable();
-}
-
-/**
- * Add navigation for GiftAid under "Administer/CiviContribute" menu
- *
- * @param \Civi\Core\Event\GenericHookEvent $event
- * @param string $hookName
- *
- * @throws \CRM_Core_Exception
- */
-function civigiftaid_symfony_civicrm_navigationMenu($event, $hookName) {
-  // @fixme: Move this to managed/navigationmenu.mgd.php
-  //   To do that we should build a searchkit based form for the "Basic Rate Tax".
-
-  // Get optionvalue ID for basic rate tax setting
-  $result = civicrm_api3('OptionValue', 'getsingle', ['name' => 'basic_rate_tax']);
-  if ($result['id']) {
-    $ovId = $result['id'];
-    $ogId = $result['option_group_id'];
-  }
-
-  $item = [
-    'label' => E::ts('GiftAid Basic Rate Tax'),
-    'name'       => 'giftaid_basic_rate_tax',
-    'url'        => "civicrm/admin/options?action=update&id=$ovId&gid=$ogId&reset=1",
-    'permission' => 'access CiviContribute',
-    'operator'   => NULL,
-    'separator'  => NULL,
-  ];
-  _civigiftaid_civix_insert_navigation_menu($event->params, 'Administer/CiviContribute/admin_giftaid', $item);
-
-  _civigiftaid_civix_navigationMenu($event->params);
 }
 
 /**

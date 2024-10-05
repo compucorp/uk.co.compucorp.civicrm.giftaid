@@ -10,12 +10,18 @@
  */
 
 use Civi\Api4\CustomGroup;
+use Civi\Core\Event\GenericHookEvent;
+use Civi\Core\Service\AutoSubscriber;
 use CRM_Civigiftaid_ExtensionUtil as E;
 
 /**
  * Class CRM_Civigiftaid_Hook_Post_SetContributionGiftAidEligibility.
  */
-class CRM_Civigiftaid_SetContributionGiftAidEligibility {
+class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
+
+  public static function getSubscribedEvents() {
+    return ['hook_civicrm_postCommit' => 'runCallback'];
+  }
 
   /**
    * Set the gift aid eligibility for a contribution if it has an eligible financial type.
@@ -25,7 +31,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @throws \CRM_Extension_Exception
    * @throws \CRM_Core_Exception
    */
-  public static function runCallback($event) {
+  public static function runCallback(GenericHookEvent $event) {
     if (($event->entity !== 'Contribution') || !in_array($event->action, ['create', 'edit'])) {
       return;
     }
@@ -66,7 +72,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @throws \CRM_Extension_Exception
    * @throws \CRM_Core_Exception
    */
-  public static function setGiftAidEligibilityStatus($contributionID, $action = 'edit') {
+  public static function setGiftAidEligibilityStatus(int $contributionID, string $action = 'edit'): bool {
     $contributionEligibleGiftAidFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid');
     $contributionBatchNameFieldName = CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid');
 
@@ -149,7 +155,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @return string
    *
    */
-  private static function getMissingGiftAidDeclarationMessage($contactId) {
+  private static function getMissingGiftAidDeclarationMessage(int $contactId): string {
     $giftAidDeclarationGroupId = CustomGroup::get(FALSE)
       ->addSelect('id')
       ->addWhere('name', '=', 'gift_aid_declaration')
@@ -181,7 +187,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
    * @return bool
    *   Whether eligible or not.
    */
-  private static function financialTypeIsEligible($financialType) {
+  private static function financialTypeIsEligible(int $financialType): bool {
     $eligibleFinancialTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
     return in_array($financialType, $eligibleFinancialTypes);
   }
