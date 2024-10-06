@@ -164,33 +164,15 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
       break;
 
     case 'Contribution':
-      if ($op == 'edit' || $op == 'create') {
-        $callbackParams = [
-          'entity' => $objectName,
-          'op' => $op,
-          'id' => $objectId,
-          'details' => $objectRef,
-        ];
-        civigiftaid_callback_civicrm_post_contribution($callbackParams);
+      if ($op === 'edit' || $op === 'create') {
+        if (isset(Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'])) {
+          return;
+        }
+        Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'] = TRUE;
+        CRM_Civigiftaid_Declaration::update($objectId);
       }
       break;
   }
-}
-
-/**
- * Callback for hook_civicrm_post_contribution
- *
- * @param array $params
- *
- * @throws \CRM_Extension_Exception
- * @throws \CRM_Core_Exception
- */
-function civigiftaid_callback_civicrm_post_contribution($params) {
-  if (isset(Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'])) {
-    return;
-  }
-  Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'] = TRUE;
-  CRM_Civigiftaid_Declaration::update($params['id']);
 }
 
 /**
