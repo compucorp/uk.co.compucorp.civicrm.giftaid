@@ -202,7 +202,7 @@ function civigiftaid_callback_civicrm_post_contribution($params) {
  * @throws \CRM_Core_Exception
  */
 function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, &$errors) {
-  if ($formName == 'CRM_Contact_Form_CustomData') {
+  if ($formName === 'CRM_Contact_Form_CustomData') {
     $groupID = $form->getVar('_groupID');
     $contactID = $form->getVar('_entityId');
     $tableName = CustomGroup::get(FALSE)
@@ -211,7 +211,7 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
       ->execute()
       ->first()['table_name'];
 
-    if ($tableName == 'civicrm_value_gift_aid_declaration') {
+    if ($tableName === 'civicrm_value_gift_aid_declaration') {
       // Assemble multi-value field values from custom_X_Y into
       // array $declarations of sets of values as column_name => value
       $columnNames = \Civi\Api4\CustomField::get(FALSE)

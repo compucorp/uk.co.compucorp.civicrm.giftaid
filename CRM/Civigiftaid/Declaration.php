@@ -27,7 +27,7 @@ class CRM_Civigiftaid_Declaration {
    *
    * @throws \CRM_Core_Exception
    */
-  public static function update($contributionID) {
+  public static function update(int $contributionID) {
     // If declaration updated via contribution page etc. it will have been set in postProcess
     $session = CRM_Core_Session::singleton();
     if ($session->get('uktaxpayer', E::LONG_NAME)) {
