@@ -31,7 +31,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
    * @throws \CRM_Extension_Exception
    * @throws \CRM_Core_Exception
    */
-  public static function runCallback(GenericHookEvent $event) {
+  public function runCallback(GenericHookEvent $event) {
     if (($event->entity !== 'Contribution') || !in_array($event->action, ['create', 'edit'])) {
       return;
     }
