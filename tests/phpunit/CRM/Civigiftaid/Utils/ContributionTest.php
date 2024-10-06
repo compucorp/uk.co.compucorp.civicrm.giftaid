@@ -342,27 +342,14 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
     unset(Civi::$statics[E::LONG_NAME]); //['updatedDeclarationAmount']);
     unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
 
-    foreach ($declarations as $declarationIndex => $declaration) {
-      foreach ($declaration as $key => $value) {
-        if (in_array($key, ['start_date', 'given_date', 'end_date'])) {
-          unset($declarations[$declarationIndex][$key]);
-          $declarationDates[$declarationIndex][$key] = $value;
-        }
-      }
-    }
     if ($declarations) {
-      $customValueResults = CustomValue::save('gift_aid_declaration', FALSE)
+      CustomValue::save('gift_aid_declaration', FALSE)
         ->addDefault('entity_id', $this->contacts[0]['id'])
         ->addDefault('address', 'Somewhere')
         ->addDefault('post_code', 'SW1A 0AA')
         ->addDefault('source', 'test')
         ->setRecords($declarations)
         ->execute();
-      $index = 0;
-      foreach ($customValueResults as $customValueResult) {
-        CRM_Civigiftaid_Declaration::fixBrokenApi4CustomValueUpdateDateFields($customValueResult['id'], $declarationDates[$index]);
-        $index++;
-      }
     }
 
     // Create contribution with order api
@@ -823,16 +810,15 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
     $contactID = $this->contacts[0]['id'];
 
     // Create a declaration for this contact.
-    $customValueID = CustomValue::create('gift_aid_declaration', FALSE)
+    CustomValue::create('gift_aid_declaration', FALSE)
       ->addValue('entity_id', $contactID)
       ->addValue('eligible_for_gift_aid', 1)
       ->addValue('address', 'somewhere')
       ->addValue('post_code', 'SW1A 0AA')
-      //->addValue('start_date', '20200101')
+      ->addValue('start_date', '20200101')
       ->addValue('source', 'test 1')
       ->execute()
       ->first()['id'];
-    CRM_Civigiftaid_Declaration::fixBrokenApi4CustomValueUpdateDateFields($customValueID, ['start_date' => '20200101']);
   }
 
   /**

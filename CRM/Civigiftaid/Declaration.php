@@ -231,13 +231,13 @@ class CRM_Civigiftaid_Declaration {
       $customValueAPI->addValue('post_code', $params['post_code']);
     }
     if (isset($params['start_date'])) {
-      //$customValueAPI->addValue('start_date', $params['start_date']);
+      $customValueAPI->addValue('start_date', $params['start_date']);
     }
     if (isset($params['given_date'])) {
-      //$customValueAPI->addValue('given_date', $params['given_date']);
+      $customValueAPI->addValue('given_date', $params['given_date']);
     }
     if (isset($params['end_date'])) {
-      //$customValueAPI->addValue('end_date', $params['end_date']);
+      $customValueAPI->addValue('end_date', $params['end_date']);
     }
     if (isset($params['reason_ended'])) {
       $customValueAPI->addValue('reason_ended', $params['reason_ended']);
@@ -250,37 +250,7 @@ class CRM_Civigiftaid_Declaration {
     }
 
     // Insert or update.
-    $customValueID = $customValueAPI->execute()->first()['id'];
-    self::fixBrokenApi4CustomValueUpdateDateFields($customValueID, $params);
-  }
-
-  /**
-   * See https://github.com/civicrm/civicrm-core/pull/22726 - datetime customfield doesn't work with API4!
-   * @param int $customValueID
-   * @param array $params
-   *
-   * @return void
-   */
-  public static function fixBrokenApi4CustomValueUpdateDateFields(int $customValueID, array $params) {
-    // See https://github.com/civicrm/civicrm-core/pull/22726 - datetime customfield doesn't work with API4!
-    $sqlValues[1] = [$customValueID, 'Int'];
-    if (isset($params['given_date'])) {
-      $setValues[] = 'given_date=%2';
-      $sqlValues[2] = [$params['given_date'], 'Timestamp'];
-    }
-    if (isset($params['start_date'])) {
-      $setValues[] = 'start_date=%3';
-      $sqlValues[3] = [$params['start_date'], 'Timestamp'];
-    }
-    if (isset($params['end_date'])) {
-      $setValues[] = 'end_date=%4';
-      $sqlValues[4] = [$params['end_date'], 'Timestamp'];
-    }
-    if (!empty($setValues)) {
-      $setValuesSQL = implode(',', $setValues);
-      $sql = "UPDATE civicrm_value_gift_aid_declaration SET {$setValuesSQL} WHERE id=%1";
-      CRM_Core_DAO::executeQuery($sql, $sqlValues);
-    }
+    $customValueAPI->execute()->first()['id'];
   }
 
   /**
