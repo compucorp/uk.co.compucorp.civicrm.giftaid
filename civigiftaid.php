@@ -86,8 +86,15 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   $session = CRM_Core_Session::singleton();
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
     $ukTaxPayerField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration');
-    if (isset($form->_submitValues[$ukTaxPayerField])) {
-      $session->set('uktaxpayer', $form->_submitValues[$ukTaxPayerField], E::LONG_NAME);
+    // submittedValue might come in with key `custom_23` or `custom_23_x` as it is a multi-value custom field.
+    foreach ($form->getSubmittedValues() as $submittedKey => $submittedValue) {
+      if (str_starts_with($submittedKey, $ukTaxPayerField)) {
+        $ukTaxPayer = $submittedValue;
+        break;
+      }
+    }
+    if (isset($ukTaxPayer)) {
+      $session->set('uktaxpayer', $ukTaxPayer, E::LONG_NAME);
     }
   }
   // Get the title of the submitted form
