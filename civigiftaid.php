@@ -207,6 +207,7 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
         ->addSelect('column_name')
         ->addWhere('custom_group_id', '=', $groupID)
         ->execute()
+        ->indexBy('id')
         ->column('column_name');
 
       $declarations = [];
