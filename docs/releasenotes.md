@@ -9,13 +9,17 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.7.1 (2024-10-14)
+
+* [!45](https://lab.civicrm.org/extensions/ukgiftaid/-/merge_requests/45) Fix issue where custom field names are not correctly identified.
+
 ## Release 3.7 (2024-10-06)
 
 * Switch to EntityFramework v2.
 * Handle multivalue customfield keys when submitting form (eg. for backend edit/update) - fixes some missed updates.
 * Switch more functions to API4.
 * Remove workaround for customvalue::save API that was fixed in 5.48.
-* Move more code to AutoSubscriber/Managed Entities
+* Move more code to AutoSubscriber/Managed Entities.
 
 ## Release 3.6.1 (2024-07-31)
 
