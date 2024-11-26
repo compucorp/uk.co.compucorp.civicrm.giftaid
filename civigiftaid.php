@@ -85,10 +85,13 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
-    $ukTaxPayerField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration');
+    // let's get the id for custom field that is used for gift aid declaration
+    $ukTaxPayerField = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', FALSE);
+
     // submittedValue might come in with key `custom_23` or `custom_23_x` as it is a multi-value custom field.
     foreach ($form->getSubmittedValues() as $submittedKey => $submittedValue) {
-      if (str_starts_with($submittedKey, $ukTaxPayerField)) {
+      // match if custom field id exists in the submitted values
+      if (CRM_Core_BAO_CustomField::getKeyID($submittedKey) == $ukTaxPayerField) {
         $ukTaxPayer = $submittedValue;
         break;
       }
