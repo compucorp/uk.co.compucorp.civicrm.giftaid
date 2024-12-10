@@ -116,7 +116,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
           $eligibility = 0;
           // We need to look through line items to determine if any of them are eligible.
           if (empty($contribution['line_items'])) {
-            // Issue #9: Sometimes line_itmes are not returned!
+            // Issue #9: Sometimes line_items are not returned!
             if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
               $eligibility = 1;
             }
