@@ -177,10 +177,61 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
           return;
         }
         Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'] = TRUE;
+        _civigiftaid_drupal8_webform_uktaxpayer();
         CRM_Civigiftaid_Declaration::update($objectId);
       }
       break;
   }
+}
+
+/**
+ * Special handling for Drupal8+ webform as we don't trigger form_postProcess and are triggered directly from postCommit
+ * Currently sets the session var uktaxpayer which is read later in CRM_Civigiftaid_Declaration::update
+ *
+ * @return void
+ * @throws \CRM_Core_Exception
+ */
+function _civigiftaid_drupal8_webform_uktaxpayer() {
+  // Only retrieve value from webform if Drupal8+
+  if (\CRM_Core_Config::singleton()->userFramework !== 'Drupal8') {
+    return;
+  }
+  /*
+   * For a correctly configured Drupal8+ webform we should see something like this in $_REQUEST:
+   * [civicrm_1_contact_1_cg9_custom_32] => Array
+       (
+         [1] => 1
+       )
+     [form_id] => webform_submission_mjwtest_make_a_donation_add_form
+  */
+
+  // If form_id not set we're not processing a webform submission
+  $formID = CRM_Utils_Request::retrieveValue('form_id', 'String', NULL, FALSE, 'REQUEST');
+  if (empty($formID)) {
+    return;
+  }
+  \Civi::log('ukgiftaid')->info('Webform ' . $formID . ' was submitted');
+
+  // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
+  // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
+  $session = CRM_Core_Session::singleton();
+  if (!$session->get('uktaxpayer', E::LONG_NAME)) {
+    // let's get the id for custom field that is used for gift aid declaration
+    $ukTaxPayerCustomFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', TRUE);
+    $requestKeys = array_keys($_REQUEST);
+    foreach ($requestKeys as $key) {
+      if (str_ends_with($key, $ukTaxPayerCustomFieldName)) {
+        $ukTaxPayerFormKey = $key;
+        break;
+      }
+    }
+    if (isset($ukTaxPayerFormKey)) {
+      $ukTaxPayer = (int) CRM_Utils_Type::validate(reset($_REQUEST[$ukTaxPayerFormKey]), 'Int');
+      $session->set('uktaxpayer', $ukTaxPayer, E::LONG_NAME);
+      \Civi::log()->info('ukTaxPayer set to ' . $ukTaxPayer);
+    }
+  }
+
 }
 
 /**
