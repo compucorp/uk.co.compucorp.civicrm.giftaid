@@ -272,6 +272,7 @@ function civicrm_api3_gift_aid_updatedeclarations($params) {
 
   try {
     foreach ($contactIDs as $contactID) {
+      $contactID = (int) $contactID;
       if ($params['all']) {
         $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactID);
         if (empty($declarations)) {

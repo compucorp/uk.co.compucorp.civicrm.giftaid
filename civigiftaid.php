@@ -111,18 +111,23 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
     return;
   }
 
+  /** @var \CRM_Contact_Form_CustomData $form */
+
   // Copy the contact's home address to the declaration, when the declaration is created
   // Only for offline contribution
   $groupID = $form->getVar('_groupID');
   $contactID = $form->getVar('_entityId');
+  if (!is_numeric($contactID)) {
+    \Civi::log('ukgiftaid')->error('ukgiftaid postProcess ' . $formName . ': Contact ID is not an integer!');
+    return;
+  }
   $customGroupTableName = CustomGroup::get(FALSE)
     ->addSelect('table_name')
     ->addWhere('id', '=', $groupID)
     ->execute()
     ->first()['table_name'];
-  if ($customGroupTableName == 'civicrm_value_gift_aid_declaration') {
-    $declarationUpdateParams = ['entity_id' => $contactID];
-    CRM_Civigiftaid_Declaration::updateDeclarationAddress($declarationUpdateParams);
+  if (($customGroupTableName === 'civicrm_value_gift_aid_declaration') && !empty($contactID)) {
+    CRM_Civigiftaid_Declaration::updateDeclarationAddress((int) $contactID);
   }
 }
 
@@ -197,6 +202,10 @@ function civigiftaid_civicrm_validateForm($formName, &$fields, &$files, &$form, 
   if ($formName === 'CRM_Contact_Form_CustomData') {
     $groupID = $form->getVar('_groupID');
     $contactID = $form->getVar('_entityId');
+    if (!is_numeric($contactID)) {
+      \Civi::log('ukgiftaid')->error('ukgiftaid validateForm ' . $formName . ': Contact ID is not an integer!');
+      return;
+    }
     $tableName = CustomGroup::get(FALSE)
       ->addSelect('table_name')
       ->addWhere('id', '=', $groupID)

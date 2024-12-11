@@ -69,12 +69,7 @@ class CRM_Civigiftaid_Declaration {
    * @return array
    * @throws \CRM_Core_Exception
    */
-  public static function getAddressAndPostalCode($contactID) {
-    if (empty($contactID)) {
-      // @fixme Maybe this should throw an exception as it's unclear what happens if we don't have a contact ID here
-      return ['', ''];
-    }
-
+  public static function getAddressAndPostalCode(int $contactID) {
     $fullFormattedAddress = $postalCode = '';
 
     // get Address & Postal Code of the contact
@@ -178,18 +173,18 @@ class CRM_Civigiftaid_Declaration {
    * Update the address on the current declaration for a contact
    * This is usually triggered when creating/editing a declaration from the contact record
    *
-   * @param array $params
+   * @param int $contactID
    *
    * @throws \CRM_Core_Exception
    */
-  public static function updateDeclarationAddress($params) {
+  public static function updateDeclarationAddress(int $contactID) {
     // Get the current declaration for the contact
-    $currentDeclaration = CRM_Civigiftaid_Declaration::getDeclaration($params['entity_id']);
+    $currentDeclaration = CRM_Civigiftaid_Declaration::getDeclaration($contactID);
 
     // Only update address if empty. Get current address/postcode formatted for giftaid.
     if (empty($currentDeclaration['address']) || empty($currentDeclaration['post_code'])) {
       // Get the home address of the contact
-      list($updateParams['address'], $updateParams['post_code']) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($params['entity_id']);
+      list($updateParams['address'], $updateParams['post_code']) = CRM_Civigiftaid_Declaration::getAddressAndPostalCode($contactID);
     }
     if (!empty($updateParams)) {
       $updateParams['id'] = $currentDeclaration['id'];
@@ -202,7 +197,7 @@ class CRM_Civigiftaid_Declaration {
    *
    * @param array $params
    */
-  public static function insertDeclaration($params) {
+  public static function insertDeclaration(array $params) {
     if (isset($params['id'])) {
       $customValueAPI = CustomValue::update('gift_aid_declaration', FALSE)
         ->addWhere('id', '=', $params['id']);
