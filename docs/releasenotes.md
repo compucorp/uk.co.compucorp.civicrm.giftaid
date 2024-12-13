@@ -9,6 +9,11 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 3.7.2 (2024-12-13)
+
+* Handle address updates for Drupal8+ webform.
+* [!47](https://lab.civicrm.org/extensions/ukgiftaid/-/merge_requests/47) Fixes for address and other gift aid information not saved.
+
 ## Release 3.7.1 (2024-10-14)
 
 * [!45](https://lab.civicrm.org/extensions/ukgiftaid/-/merge_requests/45) Fix issue where custom field names are not correctly identified.
