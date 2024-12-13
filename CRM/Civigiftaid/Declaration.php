@@ -380,6 +380,14 @@ class CRM_Civigiftaid_Declaration {
             }
           }
 
+          // Allow updating address/postcode on existing declarations
+          if (!empty($newParams['address']) && $newParams['address'] !== $currentDeclaration['address']) {
+            $updateParams['address'] = $newParams['address'];
+          }
+          if (!empty($newParams['post_code']) && $newParams['post_code'] !== $currentDeclaration['post_code']) {
+            $updateParams['post_code'] = $newParams['post_code'];
+          }
+
           if (!empty($updateParams)) {
             $updateParams['id'] = $currentDeclaration['id'];
             CRM_Civigiftaid_Declaration::insertDeclaration($updateParams);

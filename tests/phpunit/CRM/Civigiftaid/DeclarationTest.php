@@ -437,6 +437,11 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
         ['given_date' => '2022-01-03 23:35:00', 'address' => "1 High Street\nMy Area\nBig Place\nbp11aj"],
         ['address' => "1 High Street, My Area, Big Place", 'post_code' => 'BP1 1AJ', 'start_date' =>'2022-01-01 00:00:00',  'given_date' => '2022-01-03 23:35:00']
       ],
+      [
+        ['start_date' => '2022-01-01 00:00:00', 'given_date' => '2022-01-05 13:05:00', 'reformat_address' => TRUE, 'replace_address' => TRUE, 'street_address' => '2 High Street', 'supplemental_address_1' => 'My Area', 'city' => 'Big Place', 'postal_code' => 'BP1 1AK'],
+        ['given_date' => '2022-01-03 23:35:00', 'address' => "1 High Street\nMy Area\nBig Place\nbp11aj"],
+        ['address' => "2 High Street, My Area, Big Place", 'post_code' => 'BP1 1AK', 'start_date' =>'2022-01-01 00:00:00',  'given_date' => '2022-01-03 23:35:00']
+      ],
     ];
   }
 
@@ -454,8 +459,23 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       }
     }
     CRM_Civigiftaid_Declaration::insertDeclaration($declaration + $entityIdParam);
-    $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
 
+    if (isset($apiParams['street_address'])) {
+      // If replace_address is set (ie. we should update declaration with latest address from contact)
+      // then the declaration code will pull the new address from the contact.
+      // Because we are running tests we didn't actually create an address on the contact but wrote it
+      // directly to the declaration.
+      // So we create a new address on the contact here and it should be updated on the declaration
+      \Civi\Api4\Address::create(FALSE)
+        ->addValue('is_primary', TRUE)
+        ->addValue('contact_id', $contactId)
+        ->addValue('street_address', $apiParams['street_address'])
+        ->addValue('supplemental_address_1', $apiParams['supplemental_address_1'] ?? '')
+        ->addValue('city', $apiParams['city'] ?? '')
+        ->addValue('postal_code', $apiParams['postal_code'] ?? '')
+        ->execute();
+      unset($apiParams['street_address'], $apiParams['supplemental_address_1'], $apiParams['city'], $apiParams['postal_code']);
+    }
     civicrm_api3('GiftAid', 'updateDeclarations', $apiParams + ['contact_id' => $contactId] );
     $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($contactId);
 

@@ -173,28 +173,72 @@ function civigiftaid_civicrm_postCommit($op, $objectName, $objectId, &$objectRef
 
     case 'Contribution':
       if ($op === 'edit' || $op === 'create') {
-        if (isset(Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'])) {
-          return;
+        if (!_civigiftaid_drupal8_postCommitUpdateDeclaration($objectName, $objectId)) {
+          if (isset(Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'])) {
+            return;
+          }
+          Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'] = TRUE;
+          CRM_Civigiftaid_Declaration::update($objectId);
         }
-        Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'] = TRUE;
-        _civigiftaid_drupal8_webform_uktaxpayer();
-        CRM_Civigiftaid_Declaration::update($objectId);
       }
       break;
+
+    case 'Address':
+      // We only need this for Drupal8 Webform because Contribution is created before Address
+      // so need both to make sure we get latest address
+      if ($op === 'edit' || $op === 'create') {
+        _civigiftaid_drupal8_postCommitUpdateDeclaration($objectName, $objectId);
+      }
   }
 }
 
 /**
- * Special handling for Drupal8+ webform as we don't trigger form_postProcess and are triggered directly from postCommit
- * Currently sets the session var uktaxpayer which is read later in CRM_Civigiftaid_Declaration::update
+ * Drupal8+ webform creates the contribution before saving the address so we can end up with an old address
+ * being added to the gift-aid declaration.
+ * Trigger the declaration update only once we've had an Address and Contribution to make sure we record latest address
+ * @param string $entity
+ * @param int $objectId
  *
- * @return void
+ * @return bool
  * @throws \CRM_Core_Exception
  */
-function _civigiftaid_drupal8_webform_uktaxpayer() {
+function _civigiftaid_drupal8_postCommitUpdateDeclaration(string $entity, int $objectId): bool {
+  if (!_civigiftaid_is_drupal8_webform()) {
+    return FALSE;
+  }
+
+  switch ($entity) {
+    case 'Address':
+      Civi::$statics[E::LONG_NAME]['d8webform_address_id'] = $objectId;
+      break;
+
+    case 'Contribution':
+      Civi::$statics[E::LONG_NAME]['d8webform_contribution_id'] = $objectId;
+      break;
+  }
+
+  if (!empty(Civi::$statics[E::LONG_NAME]['d8webform_address_id']) && !empty(Civi::$statics[E::LONG_NAME]['d8webform_contribution_id'])) {
+    _civigiftaid_drupal8_webform_uktaxpayer();
+    if (isset(Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'])) {
+      return TRUE;
+    }
+    Civi::$statics[E::LONG_NAME]['updatedDeclarationAmount'] = TRUE;
+    CRM_Civigiftaid_Declaration::update(Civi::$statics[E::LONG_NAME]['d8webform_contribution_id']);
+  }
+
+  return TRUE;
+}
+
+/**
+ * Check if we are called from drupal8+ webform
+ *
+ * @return bool
+ * @throws \CRM_Core_Exception
+ */
+function _civigiftaid_is_drupal8_webform(): bool {
   // Only retrieve value from webform if Drupal8+
   if (\CRM_Core_Config::singleton()->userFramework !== 'Drupal8') {
-    return;
+    return FALSE;
   }
   /*
    * For a correctly configured Drupal8+ webform we should see something like this in $_REQUEST:
@@ -208,16 +252,37 @@ function _civigiftaid_drupal8_webform_uktaxpayer() {
   // If form_id not set we're not processing a webform submission
   $formID = CRM_Utils_Request::retrieveValue('form_id', 'String', NULL, FALSE, 'REQUEST');
   if (empty($formID)) {
-    return;
+    return FALSE;
   }
   \Civi::log('ukgiftaid')->info('Webform ' . $formID . ' was submitted');
+  return TRUE;
+}
 
+/**
+ * Special handling for Drupal8+ webform as we don't trigger form_postProcess and are triggered directly from postCommit
+ * Currently sets the session var uktaxpayer which is read later in CRM_Civigiftaid_Declaration::update
+ *
+ * @return void
+ * @throws \CRM_Core_Exception
+ */
+function _civigiftaid_drupal8_webform_uktaxpayer() {
+  if (!_civigiftaid_is_drupal8_webform()) {
+    return;
+  }
   // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
     // let's get the id for custom field that is used for gift aid declaration
     $ukTaxPayerCustomFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', TRUE);
+    /*
+ * For a correctly configured Drupal8+ webform we should see something like this in $_REQUEST:
+ * [civicrm_1_contact_1_cg9_custom_32] => Array
+     (
+       [1] => 1
+     )
+   [form_id] => webform_submission_mjwtest_make_a_donation_add_form
+*/
     $requestKeys = array_keys($_REQUEST);
     foreach ($requestKeys as $key) {
       if (str_ends_with($key, $ukTaxPayerCustomFieldName)) {
