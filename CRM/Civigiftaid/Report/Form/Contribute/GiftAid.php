@@ -277,24 +277,6 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
   public function statistics(&$rows) {
     $statistics = parent::statistics($rows);
 
-    $totals = [
-      'contribution' => 0,
-      'eligibleAmount' => 0,
-      'giftAidAmount' => 0,
-    ];
-    $giftAidEligibleAmountField = 'civicrm_value_gift_aid_submission_' . CRM_Civigiftaid_Utils::getCustomByName('amount', 'gift_aid');
-    $giftAidAmountField = 'civicrm_value_gift_aid_submission_' . CRM_Civigiftaid_Utils::getCustomByName('gift_aid_amount', 'gift_aid');
-
-    foreach ($rows as $row) {
-      $totals['contribution'] += $row['civicrm_contribution_contribution_amount'];
-      $totals['eligibleAmount'] += $row[$giftAidEligibleAmountField];
-      $totals['giftAidAmount'] += $row[$giftAidAmountField];
-    }
-
-    foreach ($totals as $key => $value) {
-      $totals[$key] = number_format($value, 2);
-    }
-
     $select = "
       SELECT SUM({$this->_aliases['civicrm_value_gift_aid_submission']}.amount) as amount,
         SUM({$this->_aliases['civicrm_value_gift_aid_submission']}.gift_aid_amount) as gift_aid_amount
