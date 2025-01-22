@@ -37,7 +37,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
     }
 
     if (self::setGiftAidEligibilityStatus($event->id, $event->action)) {
-      $event->object->find();
+      $event->object->find(TRUE);
       if (!CRM_Civigiftaid_Declaration::getDeclaration($event->object->contact_id)) {
         if (CRM_Core_Session::getLoggedInContactID() && CRM_Core_Permission::check('access CiviContribute')) {
           // Only show message if we have a logged in contact with permissions to access CiviContribute
