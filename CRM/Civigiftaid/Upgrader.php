@@ -432,7 +432,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
 
   private function ensureReportInstanceExist() {
     $ogId = $this->getReportTemplateGroupId();
-    
+
     return CRM_Core_BAO_OptionValue::ensureOptionValueExists([
       'option_group_id' => $ogId,
       'label' => 'Gift Aid Report',
@@ -455,10 +455,9 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
     catch (Exception $e) {
       $reportID = NULL;
     }
-
+    $reportTemplate = $this->ensureReportInstanceExist();
     if (!$reportID) {
       try {
-        $reportTemplate = $this->ensureReportInstanceExist();
         civicrm_api3('ReportInstance', 'create', [
           'title' => $reportTemplate['label'],
           'report_id' => $reportTemplate['value'],
@@ -747,6 +746,13 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
         ->execute();
     }
 
+    return TRUE;
+  }
+
+  public function upgrade_3119() {
+    $this->log('Check and create GiftAid report instance');
+    $this->removeLegacyRegisteredReport();
+    $this->createReportInstance();
     return TRUE;
   }
 
