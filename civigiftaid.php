@@ -275,14 +275,23 @@ function _civigiftaid_drupal8_webform_uktaxpayer() {
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
     // let's get the id for custom field that is used for gift aid declaration
     $ukTaxPayerCustomFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', TRUE);
-    /*
- * For a correctly configured Drupal8+ webform we should see something like this in $_REQUEST:
- * [civicrm_1_contact_1_cg9_custom_32] => Array
-     (
-       [1] => 1
-     )
-   [form_id] => webform_submission_mjwtest_make_a_donation_add_form
-*/
+
+
+    // For a correctly configured Drupal8+ webform we should see something like this in $_REQUEST:
+    //
+    //  if using checkbox input...
+    //
+    //    [form_id] => webform_submission_mjwtest_make_a_donation_add_form,
+    //    [civicrm_1_contact_1_cg9_custom_32] => Array
+    //           (
+    //             [1] => 1
+    //           )
+    //
+    //  or if using radio input...
+    //
+    //    [form_id] => webform_submission_mjwtest_make_a_donation_add_form,
+    //    [civicrm_1_contact_1_cg9_custom_32] => 1
+    //
     $requestKeys = array_keys($_REQUEST);
     foreach ($requestKeys as $key) {
       if (str_ends_with($key, $ukTaxPayerCustomFieldName)) {
@@ -291,7 +300,10 @@ function _civigiftaid_drupal8_webform_uktaxpayer() {
       }
     }
     if (isset($ukTaxPayerFormKey)) {
-      $ukTaxPayer = (int) CRM_Utils_Type::validate(reset($_REQUEST[$ukTaxPayerFormKey]), 'Int');
+      $requestVal = $_REQUEST[$ukTaxPayerFormKey];
+      // if the request value comes through as an array, take the first value
+      $requestVal = is_array($requestVal) ? reset($requestVal) : $requestVal;
+      $ukTaxPayer = (int) CRM_Utils_Type::validate($requestVal, 'Int');
       $session->set('uktaxpayer', $ukTaxPayer, E::LONG_NAME);
       \Civi::log()->info('ukTaxPayer set to ' . $ukTaxPayer);
     }
