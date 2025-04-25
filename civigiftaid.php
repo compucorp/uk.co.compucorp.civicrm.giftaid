@@ -272,10 +272,13 @@ function _civigiftaid_drupal8_webform_uktaxpayer() {
   // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
+  // clear any old existing session var.
+  $session->set('uktaxpayer', NULL, E::LONG_NAME);
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
     // let's get the id for custom field that is used for gift aid declaration
-    $ukTaxPayerCustomFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', TRUE);
-
+    // We now use the "Eligible for Gift Aid" field from the submission instead of relying on the declaration.
+    // This is because eligibility is captured directly via webforms and determines whether the UKTaxpayer field is set to on or off.
+    $ukTaxPayerCustomFieldName = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid', TRUE);
 
     // For a correctly configured Drupal8+ webform we should see something like this in $_REQUEST:
     //
