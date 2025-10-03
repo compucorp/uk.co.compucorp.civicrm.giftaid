@@ -48,7 +48,12 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility {
       if (!CRM_Civigiftaid_Declaration::getDeclaration($event->object->contact_id)) {
         if (CRM_Core_Session::getLoggedInContactID() && CRM_Core_Permission::check('access CiviContribute')) {
           // Only show message if we have a logged in contact with permissions to access CiviContribute
-          CRM_Core_Session::setStatus(self::getMissingGiftAidDeclarationMessage($event->object->contact_id), E::ts('Gift Aid Declaration'), 'info');
+          // Use static variable to prevent showing the same message multiple times per page load
+          $messageKey = 'giftaid_declaration_status_' . $id;
+          if (!isset(Civi::$statics[__CLASS__][$messageKey])) {
+            CRM_Core_Session::setStatus(self::getMissingGiftAidDeclarationMessage($event->object->contact_id), E::ts('Gift Aid Declaration'), 'info');
+            Civi::$statics[__CLASS__][$messageKey] = TRUE;
+          }
         }
       }
     }
