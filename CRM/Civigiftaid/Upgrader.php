@@ -756,6 +756,23 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3120() {
+    $this->log('Fix default value for contribution eligible_for_gift_aid custom field');
+    try {
+      $results = \Civi\Api4\CustomField::update(FALSE)
+        ->addValue('default_value', NULL)
+        ->addValue('is_required', FALSE)
+        ->addWhere('name', '=', 'eligible_for_gift_aid')
+        ->execute();
+      
+      $this->log('Successfully updated default_value for eligible_for_gift_aid field. Updated ' . count($results) . ' field(s)');
+    }
+    catch (Exception $e) {
+      $this->log('Failed to update default_value for eligible_for_gift_aid field: ' . $e->getMessage());
+    }
+    return TRUE;
+  }
+
   /**
    * Add the specified option group, gracefully if it already exists.
    *
@@ -988,6 +1005,7 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
         'label' => 'Eligible for Gift Aid?',
         'data_type' => 'Int',
         'html_type' => 'Radio',
+        'default_value' => NULL,
         'is_required' => '0',
         'is_searchable' => '1',
         'is_search_range' => '0',
