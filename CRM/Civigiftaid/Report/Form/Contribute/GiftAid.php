@@ -214,7 +214,7 @@ class CRM_Civigiftaid_Report_Form_Contribute_GiftAid extends CRM_Report_Form {
               $this->_columnHeaders["{$tableName}_{$fieldName}"]['title'] =
                 $field['title'];
               $this->_columnHeaders["{$tableName}_{$fieldName}"]['type'] =
-                CRM_Utils_Array::value('type', $field);
+                $field['type'] ?? NULL;
             }
           }
         }
