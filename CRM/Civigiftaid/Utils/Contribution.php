@@ -665,6 +665,12 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
 
     foreach ($declarations as $declaration) {
+      if (empty($declaration['start_date'])) {
+        // declaration without start date mostly means UK Tax Payer? = No
+        // hence, we can skip this record and continue to check the next declaration.
+        continue;
+      }
+
       if ($declaration['eligible_for_gift_aid'] === CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS) {
         $declaration['start_date'] = self::dateFourYearsAgo($declaration['start_date']);
       }
