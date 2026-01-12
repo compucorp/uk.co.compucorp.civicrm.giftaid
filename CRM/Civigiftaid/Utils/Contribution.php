@@ -666,8 +666,9 @@ class CRM_Civigiftaid_Utils_Contribution {
 
     foreach ($declarations as $declaration) {
       if (empty($declaration['start_date'])) {
-        // declaration without start date mostly means UK Tax Payer? = No
-        // hence, we can skip this record and continue to check the next declaration.
+        // a valid declaration should have a start date
+        // a missing start date means that either the contact isn't a UK tax payer or the declaration isn't valid
+        // in either case we should skip this declaration
         continue;
       }
 
