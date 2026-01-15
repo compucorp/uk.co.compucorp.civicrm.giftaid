@@ -739,6 +739,20 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
     return TRUE;
   }
 
+  public function upgrade_3120() {
+    $this->log('Check and create GiftAid report instance');
+    try {
+      $this->removeLegacyRegisteredReport();
+      $this->createReportInstance();
+    } catch (Throwable $e) {
+      \Civi::log()->error('Failed to create GiftAid report instance. ' . $e->getMessage());
+      
+      return False;
+    }
+
+    return TRUE;
+  }
+
   /**
    * Add the specified option group, gracefully if it already exists.
    *
