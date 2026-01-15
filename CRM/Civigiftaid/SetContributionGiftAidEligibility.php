@@ -32,16 +32,39 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
    * @throws \CRM_Core_Exception
    */
   public function runCallback(GenericHookEvent $event) {
-    if (($event->entity !== 'Contribution') || !in_array($event->action, ['create', 'edit'])) {
+    if ((!in_array($event->entity, ['Contribution', 'LineItem'])) || !in_array($event->action, ['create', 'edit'])) {
+      return;
+    }
+    
+    $id = $event->id;
+    if ($event->entity == 'LineItem') {
+      $lineItem = \Civi\Api4\LineItem::get(FALSE)
+        ->addWhere('id', '=', $id)
+        ->execute()
+        ->first();
+
+      $id = $lineItem['contribution_id'] ?? NULL;
+    }
+
+    if (empty($id)) {
       return;
     }
 
-    if (self::setGiftAidEligibilityStatus($event->id, $event->action)) {
-      $event->object->find();
-      if (!CRM_Civigiftaid_Declaration::getDeclaration($event->object->contact_id)) {
+    $contribution = \Civi\Api4\Contribution::get(FALSE)
+      ->addWhere('id', '=', $id)
+      ->addSelect('contact_id')
+      ->execute()
+      ->first();
+
+    if (empty($contribution)) {
+      return;
+    }
+
+    if (self::setGiftAidEligibilityStatus($id, $event->action)) {
+      if (!CRM_Civigiftaid_Declaration::getDeclaration($contribution['contact_id'])) {
         if (CRM_Core_Session::getLoggedInContactID() && CRM_Core_Permission::check('access CiviContribute')) {
           // Only show message if we have a logged in contact with permissions to access CiviContribute
-          CRM_Core_Session::setStatus(self::getMissingGiftAidDeclarationMessage($event->object->contact_id), E::ts('Gift Aid Declaration'), 'info');
+          CRM_Core_Session::setStatus(self::getMissingGiftAidDeclarationMessage($contribution['contact_id']), E::ts('Gift Aid Declaration'), 'info');
         }
       }
     }
