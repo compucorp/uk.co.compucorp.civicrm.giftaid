@@ -450,3 +450,27 @@ function civigiftaid_civicrm_alterCustomFieldDisplayValue(&$displayValue, $value
     }
   }
 }
+
+function civigiftaid_civicrm_customFieldOptions($fieldID, &$options, $detailedFormat = false ) {
+  $customField = \Civi\Api4\CustomField::get(FALSE)
+    ->addSelect('custom_group_id:name', 'name')
+    ->addWhere('id', '=', $fieldID)
+    ->addWhere('custom_group_id:name', '=', 'gift_aid')
+    ->execute()
+    ->first();
+
+  if (empty($customField) || $customField['name'] != 'batch_name') {
+    return ;
+  }
+
+  //transform options from id => label to name => label
+  if (!$detailedFormat) {
+    $optionValues = \Civi\Api4\OptionValue::get(FALSE)
+      ->addSelect('name', 'id', 'value', 'label')
+      ->addWhere('option_group_id:name', '=', 'giftaid_batch_name')
+      ->execute()
+      ->getArrayCopy();
+
+    $options = array_combine(array_column($optionValues, 'name'), array_column($optionValues, 'label'));
+  }
+}
