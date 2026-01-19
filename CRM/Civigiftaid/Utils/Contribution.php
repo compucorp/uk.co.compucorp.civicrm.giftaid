@@ -665,6 +665,13 @@ class CRM_Civigiftaid_Utils_Contribution {
     }
 
     foreach ($declarations as $declaration) {
+      if (empty($declaration['start_date'])) {
+        // a valid declaration should have a start date
+        // a missing start date means that either the contact isn't a UK tax payer or the declaration isn't valid
+        // in either case we should skip this declaration
+        continue;
+      }
+
       if ($declaration['eligible_for_gift_aid'] === CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS) {
         $declaration['start_date'] = self::dateFourYearsAgo($declaration['start_date']);
       }
