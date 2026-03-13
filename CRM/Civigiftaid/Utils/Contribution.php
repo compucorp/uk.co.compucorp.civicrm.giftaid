@@ -132,7 +132,13 @@ class CRM_Civigiftaid_Utils_Contribution {
           ->first()['total_amount'];
         $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
         $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
-        if ((bccomp($giftAidAmount, 0.0, 1) === 0) && (bccomp($giftAidableContribAmt, 0.0, 1) === 0)) {
+        $lineItemCount = \Civi\Api4\LineItem::get(FALSE)
+          ->selectRowCount()
+          ->addWhere('contribution_id', '=', $contributionID)
+          ->execute()
+          ->count();
+        if ((bccomp($giftAidAmount, 0.0, 1) === 0) && (bccomp($giftAidableContribAmt, 0.0, 1) === 0)
+          && $lineItemCount > 0) {
           // If we don't have an enabled financialType contribution is not eligible
           $eligibleForGiftAid = 0;
         }

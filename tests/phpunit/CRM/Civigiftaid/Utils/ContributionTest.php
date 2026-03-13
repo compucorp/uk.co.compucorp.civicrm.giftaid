@@ -402,6 +402,114 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
       ->execute();
   }
 
+  public function testEligibleContributionWithoutLineItemsRemainsEligibleUntilLineItemsExist() {
+    $this->setupFixture1();
+
+    $contributionID = Contribution::create(FALSE)
+                        ->addValue('contact_id', $this->contacts[0]['id'])
+                        ->addValue('financial_type_id', 1)
+                        ->addValue('total_amount', 100)
+                        ->execute()
+                        ->first()['id'];
+
+    // Simulate workflows (e.g. webform) where contribution exists before line items are attached.
+    \Civi\Api4\LineItem::delete(FALSE)
+      ->addWhere('contribution_id', '=', $contributionID)
+      ->execute();
+
+    CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID, 1, '');
+    $contribution = $this->fetchContributionGiftAid($contributionID);
+
+    $this->assertEquals(1, $contribution['gift_aid.eligible_for_gift_aid']);
+    $this->assertEquals(0, (float) $contribution['gift_aid.amount']);
+    $this->assertEquals(0, (float) $contribution['gift_aid.gift_aid_amount']);
+  }
+
+  public function testEligibleContributionWithEligibleLineItemsCalculatesExpectedAmounts() {
+    $this->setupFixture1();
+
+    $contributionID = civicrm_api3('Order', 'create', [
+      'contact_id' => $this->contacts[0]['id'],
+      'financial_type_id' => 1,
+      'total_amount' => 100,
+      'line_items' => [[
+        'line_item' => [[
+          'line_total' => 100,
+          'financial_type_id' => 1,
+          'price_field_id' => 1,
+          'qty' => 1,
+        ]],
+      ]],
+    ])['id'];
+
+    CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID, 1, '');
+    $contribution = $this->fetchContributionGiftAid($contributionID);
+
+    $this->assertEquals(1, $contribution['gift_aid.eligible_for_gift_aid']);
+    $this->assertEquals(100, (float) $contribution['gift_aid.amount']);
+    $this->assertEquals(25, (float) $contribution['gift_aid.gift_aid_amount']);
+  }
+
+  public function testEligibleContributionWithOnlyIneligibleLineItemsBecomesIneligible() {
+    $this->setupFixture1();
+
+    $contributionID = civicrm_api3('Order', 'create', [
+      'contact_id' => $this->contacts[0]['id'],
+      'financial_type_id' => 4,
+      'total_amount' => 100,
+      'line_items' => [[
+        'line_item' => [[
+          'line_total' => 100,
+          'financial_type_id' => 4,
+          'price_field_id' => 1,
+          'qty' => 1,
+        ]],
+      ]],
+    ])['id'];
+
+    CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID, 1, '');
+    $contribution = $this->fetchContributionGiftAid($contributionID);
+
+    $this->assertEquals(0, $contribution['gift_aid.eligible_for_gift_aid']);
+    $this->assertEquals(0, (float) $contribution['gift_aid.amount']);
+    $this->assertEquals(0, (float) $contribution['gift_aid.gift_aid_amount']);
+  }
+
+  public function testWebformLikeFlowRecalculatesEligibilityWhenLineItemsAddedLater() {
+    $this->setupFixture1();
+
+    $contribution = Contribution::create(FALSE)
+      ->addValue('contact_id', $this->contacts[0]['id'])
+      ->addValue('financial_type_id', 1)
+      ->addValue('total_amount', 100)
+      ->execute()
+      ->first();
+    $contributionID = $contribution['id'];
+
+    // Start with no line items - first calculation should keep eligible=1 and zero amounts.
+    \Civi\Api4\LineItem::delete(FALSE)
+      ->addWhere('contribution_id', '=', $contributionID)
+      ->execute();
+    CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID, 1, '');
+
+    // Add line item afterwards, then recalculate to reflect final state.
+    civicrm_api3('LineItem', 'create', [
+      'entity_table' => 'civicrm_contribution',
+      'entity_id' => $contributionID,
+      'contribution_id' => $contributionID,
+      'line_total' => 100,
+      'unit_price' => 100,
+      'qty' => 1,
+      'financial_type_id' => 1,
+    ]);
+    CRM_Civigiftaid_Utils_Contribution::updateGiftAidFields($contributionID, 1, '');
+
+    $updated = $this->fetchContributionGiftAid($contributionID);
+    $this->assertEquals(1, $updated['gift_aid.eligible_for_gift_aid']);
+    $this->assertEquals(100, (float) $updated['gift_aid.amount']);
+    $this->assertEquals(25, (float) $updated['gift_aid.gift_aid_amount']);
+  }
+
   /**
    * Data provider for testIsContributionEligible
    *
