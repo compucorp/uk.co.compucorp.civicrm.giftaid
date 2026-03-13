@@ -35,7 +35,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
     if ((!in_array($event->entity, ['Contribution', 'LineItem'])) || !in_array($event->action, ['create', 'edit'])) {
       return;
     }
-    
+
     $id = $event->id;
     if ($event->entity == 'LineItem') {
       $lineItem = \Civi\Api4\LineItem::get(FALSE)
@@ -217,7 +217,16 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
    */
   private static function financialTypeIsEligible(int $financialType): bool {
     $eligibleFinancialTypes = \Civi::settings()->get('civigiftaid_financial_types_enabled');
-    return in_array($financialType, $eligibleFinancialTypes);
+    if (!in_array($financialType, $eligibleFinancialTypes)) {
+      return FALSE;
+    }
+
+    return (bool) \Civi\Api4\FinancialType::get(FALSE)
+      ->selectRowCount()
+      ->addWhere('id', '=', $financialType)
+      ->addWhere('is_active', '=', TRUE)
+      ->execute()
+      ->count();
   }
 
 }
