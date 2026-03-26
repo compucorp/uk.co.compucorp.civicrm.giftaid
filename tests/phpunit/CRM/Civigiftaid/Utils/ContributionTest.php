@@ -956,4 +956,12 @@ class CRM_Civigiftaid_Utils_ContributionTest extends \PHPUnit\Framework\TestCase
     $this->contacts[] = $result;
 
   }
+
+  protected function fetchContributionGiftAid(int $contributionID): array {
+    return Contribution::get(FALSE)
+      ->addWhere('id', '=', $contributionID)
+      ->addSelect('gift_aid.eligible_for_gift_aid', 'gift_aid.amount', 'gift_aid.gift_aid_amount')
+      ->execute()
+      ->first();
+  }
 }
