@@ -1,0 +1,11 @@
+# Publishes tags to Composer Packages of the current project
+# @see https://lab.civicrm.org/infra/gitlab/-/issues/45
+publish:
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: on_success
+    - when: never
+  image: curlimages/curl:latest
+  stage: build
+  script:
+    - 'curl --fail-with-body --header "Job-Token: $CI_JOB_TOKEN" --data "tag=$CI_COMMIT_TAG" "${CI_API_V4_URL}/projects/$CI_PROJECT_ID/packages/composer"'
