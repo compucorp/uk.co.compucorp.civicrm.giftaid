@@ -4,12 +4,12 @@
     <path>civicrm/admin/setting/ukgiftaid</path>
     <title>Gift Aid settings</title>
     <page_callback>CRM_Admin_Form_Generic</page_callback>
-    <access_arguments>administer CiviCRM</access_arguments>
+    <access_arguments>edit contributions</access_arguments>
   </item>
   <item>
     <path>civicrm/ukgiftaid/task</path>
     <title>Add/remove contributions from Gift Aid batch</title>
     <page_callback>CRM_Civigiftaid_Controller_Task</page_callback>
-    <access_arguments>administer CiviCRM</access_arguments>
+    <access_arguments>edit contributions</access_arguments>
   </item>
 </menu>
