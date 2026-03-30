@@ -36,6 +36,10 @@ class CRM_Civigiftaid_Form_Task_AddToBatch extends CRM_Contribute_Form_Task {
   protected $batchTitle;
 
   public function preProcess() {
+    if (!\CRM_Core_Permission::check('edit contributions')) {
+      \CRM_Utils_System::permissionDenied();
+      return;
+    }
     parent::preProcess();
 
     // Generate Gift Aid batch name/title
