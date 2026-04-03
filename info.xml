@@ -18,9 +18,10 @@
     <author>MJW Consulting, Rich Lott (Artful Robot) Erawat Chamanont, Jamie Novick, Guanhuan Chen, Robin Mitra</author>
     <email>mjw@mjwconsult.co.uk, https://artfulrobot.uk, jamie@compucorp.co.uk, guanhuan@compucorp.co.uk</email>
   </maintainer>
-  <releaseDate>2024-12-13</releaseDate>
+  <releaseDate>2026-04-03</releaseDate>
   <version>3.7.2</version>
   <develStage>stable</develStage>
+  <comments>patch 1</comments>
   <compatibility>
     <ver>5.74</ver>
   </compatibility>
