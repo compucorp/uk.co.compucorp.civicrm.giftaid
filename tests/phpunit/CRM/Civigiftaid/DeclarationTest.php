@@ -91,12 +91,6 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
       $this->assertIsArray($declarations, $assertionContext);
 
-      // Special case: a No declaration does not get created.
-      if ($type === CRM_Civigiftaid_Declaration::DECLARATION_IS_NO) {
-        $this->assertCount(0, $declarations, $assertionContext);
-        continue;
-      }
-
       $this->assertCount(1, $declarations, $assertionContext);
       $decl = $declarations[0];
       $this->assertEquals($this->contacts[0]['id'], $decl['entity_id'], $assertionContext);
