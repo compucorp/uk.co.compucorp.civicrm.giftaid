@@ -1,0 +1,41 @@
+<af-form ctrl="afform">
+  <af-entity data="{}" type="Individual" name="Individual1" label="Individual 1" actions="{create: true, update: false}" security="FBAC" autofill="user" />
+  <fieldset af-fieldset="Individual1" class="af-container">
+    <div class="af-container">
+      <div class="af-markup">
+        
+        <h2>Gift Aid</h2>
+
+        <p style="margin-bottom:11px"><span style="line-height:108%">Gift Aid increases the value of membership contributions and donations to charities by allowing them to reclaim basic rate tax on your gift. It allows us to claim 25% on top of your donation.</span></p>
+
+        <p style="margin-bottom:11px"><span style="line-height:108%">We would like to reclaim gift aid on your behalf. We can only reclaim Gift Aid if you are a UK taxpayer.</span></p>
+
+        <p style="margin-bottom:11px"><span style="line-height:108%">By selecting 'Yes' below you are confirming that</span></p>
+
+        <ol>
+	<li>
+	<p style="margin-bottom:11px"><span style="line-height:108%">You are a UK taxpayer</span></p>
+	</li>
+	<li>
+	<p style="margin-bottom:11px"><span style="line-height:108%">You understand that if you pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all your donations in that tax year, it is your responsibility to pay any difference.</span></p>
+	</li>
+        </ol>
+
+        <p style="margin-bottom:11px"><span style="line-height:108%"><font color="#0563c1"><u><a href="http://www.hmrc.gov.uk/individuals/giving/gift-aid.htm"><b>More about Gift Aid</b></a></u></font></span></p>
+
+      
+      </div>
+    </div>
+    <af-field name="first_name" />
+    <af-field name="last_name" />
+    <div af-join="Custom_gift_aid_declaration" actions="{update: true, delete: true}">
+      <af-field name="eligible_for_gift_aid" defn="{label: 'Can we reclaim gift aid on your donation?'}" />
+      <af-field name="address" defn="{label: 'Your address', input_attrs: {}, required: true, help_pre: null, input_type: 'Text'}" />
+      <af-field name="post_code" defn="{label: 'Post Code', input_attrs: {}, required: true}" />
+      <af-field name="start_date" defn="{afform_default: 'now', input_attrs: {}, label: false, input_type: 'Hidden'}" />
+      <af-field name="given_date" defn="{label: false, input_attrs: {}, afform_default: 'now', input_type: 'Hidden'}" />
+      <af-field name="source" defn="{afform_default: 'Gift Aid Declaration Form', input_attrs: {}, input_type: 'Hidden', label: false}" />
+    </div>
+  </fieldset>
+  <button class="af-button btn btn-primary" crm-icon="fa-check" ng-click="afform.submit()" ng-if="afform.showSubmitButton">Submit</button>
+</af-form>
