@@ -31,7 +31,7 @@ permission so it can be sent out via an email link.
 ![Gift Aid Declaration form](images/giftaid-declaration-form.png)
 
 The form asks for first name and last name (these are auto-filled when the
-contact opens it via a token link), the declaration eligibility, and the
+contact opens it via a token link), the Gift aid eligibility, and the
 address and postcode. The start date, given date and source fields are filled
 in for you - source is set to _Gift Aid Declaration Form_ so you can tell
 later which declarations came in this way.
