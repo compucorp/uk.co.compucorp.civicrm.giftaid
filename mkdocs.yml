@@ -21,6 +21,7 @@ nav:
 - "Introduction": index.md
 - "Setup and Configuration": setup.md
 - "The Gift Aid Declaration": declaration.md
+- "Collecting Declarations": collecting-declarations.md
 - "Contributions and Eligibility": contributions.md
 - "Creating and managing your batch": batches.md
 - "Submitting to HMRC / Reporting": submission.md
