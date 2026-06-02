@@ -2,35 +2,32 @@
   var CHECKBOX = 'input#civigiftaid_globally_enabled_civigiftaid_globally_enabled';
   var SELECT = '#civigiftaid_financial_types_enabled';
 
-  function updateFinancialTypesState() {
-    var disabled = $(CHECKBOX).prop('checked');
+  function updateFinancialTypesVisibility() {
     var $select = $(SELECT);
-    $select.prop('disabled', disabled);
-    // Sync the rendered crm-select2 widget so it greys out, not just the native control.
-    var select2 = $.fn.select2;
-    if (select2 && select2.amd) {
-      // select2 v4.x reflects the disabled prop on change.
-      $select.trigger('change.select2');
+    // Resolve the containing row from the field itself rather than a hard-coded
+    // row class — the previous selector (tr.crm--form-block-...) never matched
+    // the rendered markup, so the original handler was a silent no-op.
+    var $row = $select.closest('tr');
+
+    if ($(CHECKBOX).prop('checked')) {
+      // Gift aid applies to line items of ANY financial type, so the per-type
+      // "Enabled Financial Types" list is redundant: clear it and hide the row.
+      // The <select> stays in the DOM (just hidden), so the cleared value is
+      // submitted and the redundant selection is not persisted.
+      $select.val(null).trigger('change');
+      $row.hide();
     }
-    else if ($select.data('select2')) {
-      // select2 v3.x.
-      $select.select2('enable', !disabled);
+    else {
+      $row.show();
     }
   }
 
-  // Use jQuery ready (idempotent) rather than DOMContentLoaded: CiviCRM injects
-  // this script via addScriptFile, so DOMContentLoaded has usually already fired.
+  // Use jQuery ready (runs immediately if the DOM is already parsed) rather than
+  // a DOMContentLoaded listener: CiviCRM injects this script via addScriptFile,
+  // by which point DOMContentLoaded has usually already fired.
   $(function() {
-    updateFinancialTypesState();
-
-    $(CHECKBOX).on('change', updateFinancialTypesState);
-
-    // A disabled control is not submitted, which would wipe the saved financial
-    // types when the form is saved with the global checkbox ticked. Re-enable it
-    // just before submit so its value is posted.
-    $(SELECT).closest('form').on('submit', function() {
-      $(SELECT).prop('disabled', false);
-    });
+    updateFinancialTypesVisibility();
+    $(CHECKBOX).on('change', updateFinancialTypesVisibility);
   });
 
 }(CRM.$, CRM.ts('uk.co.compucorp.civicrm.giftaid')));
