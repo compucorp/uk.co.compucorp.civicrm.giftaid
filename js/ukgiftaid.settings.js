@@ -1,19 +1,23 @@
 (function($, ts) {
-  function updateVisibleElements() {
-    if ($('input#civigiftaid_globally_enabled_civigiftaid_globally_enabled').prop('checked')) {
-      $('tr.crm--form-block-civigiftaid_financial_types_enabled').hide();
+  const checkbox = 'input#civigiftaid_globally_enabled_civigiftaid_globally_enabled';
+  const select = '#civigiftaid_financial_types_enabled';
+
+  function updateFinancialTypesVisibility() {
+    let $select = $(select);
+    let $row = $select.closest('tr');
+
+    if ($(checkbox).prop('checked')) {
+      $select.val(null).trigger('change');
+      $row.hide();
     }
     else {
-      $('tr.crm--form-block-civigiftaid_financial_types_enabled').show();
+      $row.show();
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-    updateVisibleElements();
-  });
-
-  $('input#civigiftaid_globally_enabled_civigiftaid_globally_enabled').on('change', function() {
-    updateVisibleElements();
+  $(function() {
+    updateFinancialTypesVisibility();
+    $(checkbox).on('change', updateFinancialTypesVisibility);
   });
 
 }(CRM.$, CRM.ts('uk.co.compucorp.civicrm.giftaid')));
