@@ -110,6 +110,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
         'financial_type_id',
         'contact_id',
         'contribution_recur_id',
+        'total_amount',
         $contributionEligibleGiftAidFieldName,
         $contributionBatchNameFieldName,
         'line_items',
@@ -140,21 +141,29 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
           $eligibility = 1;
         }
         else {
-          // Assume not eligible until proven eligible.
-          $eligibility = NULL;
-          // We need to look through line items to determine if any of them are eligible.
           if (empty($contribution['line_items'])) {
             // Issue #9: Sometimes line_items are not returned!
-            if (self::financialTypeIsEligible($contribution['financial_type_id'])) {
-              $eligibility = 1;
-            }
+            // The contribution may exist before its line items (e.g. a Webform submission), so if the financial
+            // type is not eligible we leave eligibility NULL ("undetermined") rather than 0, so that it can be
+            // recalculated once line items exist - setting it to 0 would never be recalculated.
+            $eligibility = self::financialTypeIsEligible($contribution['financial_type_id']) ? 1 : NULL;
           }
           else {
+            $eligibility = NULL;
+            $lineItemsTotal = 0;
             foreach ($contribution['line_items'] as $lineItem) {
+              $lineItemsTotal += $lineItem['line_total'] + ($lineItem['tax_amount'] ?? 0);
               if (self::financialTypeIsEligible($lineItem['financial_type_id'])) {
                 $eligibility = 1;
                 break;
               }
+            }
+            if ($eligibility === NULL && ($lineItemsTotal + 0.01) >= (float) $contribution['total_amount']) {
+              // The line items cover the contribution total, so all of them are present and none has an
+              // eligible financial type: definitively not eligible. If they don't yet cover the total
+              // (e.g. a Webform still adding line items one by one) we leave eligibility NULL
+              // ("undetermined") so it is recalculated later - a definitive 0 would never be recalculated.
+              $eligibility = 0;
             }
           }
         }
