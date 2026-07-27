@@ -132,8 +132,21 @@ class CRM_Civigiftaid_Utils_Contribution {
         $giftAidableContribAmt = self::getGiftAidableContribAmt($totalAmount, $contributionID);
         $giftAidAmount = self::calculateGiftAidAmt($giftAidableContribAmt, self::getBasicRateTax());
         if ((bccomp($giftAidAmount, 0.0, 1) === 0) && (bccomp($giftAidableContribAmt, 0.0, 1) === 0)) {
-          // If we don't have an enabled financialType contribution is not eligible
-          $eligibleForGiftAid = NULL;
+          $lineItems = CRM_Core_DAO::executeQuery(
+            'SELECT COUNT(*) cnt, COALESCE(SUM(line_total + COALESCE(tax_amount, 0)), 0) total
+             FROM civicrm_line_item WHERE contribution_id = %1',
+            [1 => [$contributionID, 'Int']]
+          );
+          $lineItems->fetch();
+          if (((int) $lineItems->cnt) > 0 && (((float) $lineItems->total) + 0.01) >= (float) $totalAmount) {
+            // The line items cover the contribution total, so all of them are present and none has an
+            // enabled financial type: definitively not eligible.
+            $eligibleForGiftAid = 0;
+          }
+          // Otherwise leave $eligibleForGiftAid as passed in: the contribution's line items may not all exist
+          // yet (e.g. a Webform submission creates them after the contribution), so we keep the eligibility
+          // with zero amounts so that it can be recalculated once all line items exist - a definitive 0
+          // would never be recalculated.
         }
       }
       $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid')] = $eligibleForGiftAid;
