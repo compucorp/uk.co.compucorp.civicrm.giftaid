@@ -105,8 +105,11 @@ class CRM_Civigiftaid_Declaration {
       return 'NULL';
     }
     $tempAddressArray = [];
-    if (!empty($contactAddress['address_name'])) {
-      $tempAddressArray[] = $contactAddress['address_name'];
+    // APIv3 Address.get returns the address name as "name" (its column name),
+    // not as "address_name" (its unique name).
+    $addressName = $contactAddress['name'] ?? $contactAddress['address_name'] ?? NULL;
+    if (!empty($addressName)) {
+      $tempAddressArray[] = $addressName;
     }
     if (!empty($contactAddress['street_address'])) {
       $tempAddressArray[] = $contactAddress['street_address'];
