@@ -756,13 +756,8 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
   public function upgrade_3121() {
     $this->log('Fix default value for contribution eligible_for_gift_aid custom field');
     try {
-      $results = \Civi\Api4\CustomField::update(FALSE)
-        ->addValue('default_value', NULL)
-        ->addValue('is_required', FALSE)
-        ->addWhere('name', '=', 'eligible_for_gift_aid')
-        ->addWhere('custom_group_id:extends', '=', 'Contribution')
-        ->execute();
-      $this->log('Successfully updated default_value for eligible_for_gift_aid field. Updated ' . count($results) . ' field(s)');
+      $count = $this->makeContributionEligibilityFieldOptional();
+      $this->log('Successfully updated default_value for eligible_for_gift_aid field. Updated ' . $count . ' field(s)');
     }
     catch (Exception $e) {
       $this->log('Failed to update default_value for eligible_for_gift_aid field: ' . $e->getMessage());
@@ -770,6 +765,40 @@ class CRM_Civigiftaid_Upgrader extends CRM_Extension_Upgrader_Base {
       return FALSE;
     }
     return TRUE;
+  }
+
+  /**
+   * Re-apply 3121 on sites where it already ran.
+   *
+   * The original upgrade_3121 filtered on 'custom_group_id:extends', which
+   * APIv4 does not treat as a join (":extends" is not a pseudoconstant
+   * suffix), so it matched no fields and the contribution
+   * eligible_for_gift_aid field stayed required.
+   */
+  public function upgrade_3122() {
+    $this->log('Make contribution eligible_for_gift_aid custom field optional');
+    $count = $this->makeContributionEligibilityFieldOptional();
+    $this->log('Updated ' . $count . ' field(s)');
+    return TRUE;
+  }
+
+  /**
+   * Makes the contribution eligible_for_gift_aid custom field optional and
+   * removes its default value.
+   *
+   * The declaration (contact) field of the same name is left untouched.
+   *
+   * @return int
+   *   Number of fields updated.
+   */
+  public function makeContributionEligibilityFieldOptional(): int {
+    return CustomField::update(FALSE)
+      ->addValue('default_value', NULL)
+      ->addValue('is_required', FALSE)
+      ->addWhere('name', '=', 'eligible_for_gift_aid')
+      ->addWhere('custom_group_id.extends', '=', 'Contribution')
+      ->execute()
+      ->count();
   }
 
   /**
