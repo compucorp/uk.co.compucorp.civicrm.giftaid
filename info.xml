@@ -19,7 +19,7 @@
     <email>mjw@mjwconsult.co.uk, https://artfulrobot.uk, jamie@compucorp.co.uk, guanhuan@compucorp.co.uk</email>
   </maintainer>
   <releaseDate>2026-08-19</releaseDate>
-  <version>3.5.2</version>
+  <version>4.14.0</version>
   <develStage>stable</develStage>
   <compatibility>
     <ver>5.49</ver>
