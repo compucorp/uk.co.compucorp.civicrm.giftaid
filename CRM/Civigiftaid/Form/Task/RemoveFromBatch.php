@@ -18,6 +18,11 @@ use CRM_Civigiftaid_ExtensionUtil as E;
 class CRM_Civigiftaid_Form_Task_RemoveFromBatch extends CRM_Contribute_Form_Task {
 
   public function preProcess() {
+    if (!\CRM_Core_Permission::check('edit contributions')) {
+      \CRM_Utils_System::permissionDenied();
+      return;
+    }
+
     parent::preProcess();
 
     if ($this->controller instanceof CRM_Contribute_Controller_Search && $this->isSubmitted()) {
