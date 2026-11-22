@@ -141,7 +141,7 @@ class CRM_Civigiftaid_SetContributionGiftAidEligibility extends AutoSubscriber {
         }
         else {
           // Assume not eligible until proven eligible.
-          $eligibility = 0;
+          $eligibility = NULL;
           // We need to look through line items to determine if any of them are eligible.
           if (empty($contribution['line_items'])) {
             // Issue #9: Sometimes line_items are not returned!

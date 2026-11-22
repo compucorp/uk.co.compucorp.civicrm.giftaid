@@ -119,8 +119,7 @@ class CRM_Civigiftaid_Utils_Contribution {
       $contributionParams[CRM_Civigiftaid_Utils::getCustomByName('batch_name', 'gift_aid')] = $batchName;
     }
     if (isset($eligibleForGiftAid)) {
-      $eligibleForGiftAid = (int) $eligibleForGiftAid;
-      if ($eligibleForGiftAid === 0) {
+      if (((int) $eligibleForGiftAid) === 0) {
         $giftAidAmount = 0;
         $giftAidableContribAmt = 0;
       }
