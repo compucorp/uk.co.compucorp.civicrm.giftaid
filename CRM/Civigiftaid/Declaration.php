@@ -30,10 +30,15 @@ class CRM_Civigiftaid_Declaration {
   public static function update(int $contributionID) {
     // If declaration updated via contribution page etc. it will have been set in postProcess
     $session = CRM_Core_Session::singleton();
+    // Only a truthy answer kept in the session is applied here. The session value outlives the form that set
+    // it, so applying a stored "No" (0) would end the declarations of every donor whose contribution the same
+    // user records afterwards.
+    if ($session->get('uktaxpayer', E::LONG_NAME)) {
+      $contactGiftAidEligibleStatus = $session->get('uktaxpayer', E::LONG_NAME);
+    }
 
     // Get the gift aid eligible status
     // If it's not a valid number don't do any further processing
-    $contactGiftAidEligibleStatus = $session->get('uktaxpayer', E::LONG_NAME);
     if (!isset($contactGiftAidEligibleStatus)) {
       return;
     }
