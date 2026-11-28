@@ -30,16 +30,23 @@ class CRM_Civigiftaid_Declaration {
   public static function update(int $contributionID) {
     // If declaration updated via contribution page etc. it will have been set in postProcess
     $session = CRM_Core_Session::singleton();
-    // Only a truthy answer kept in the session is applied here. The session value outlives the form that set
-    // it, so applying a stored "No" (0) would end the declarations of every donor whose contribution the same
-    // user records afterwards.
+    // The answer kept in the session belongs to the donation flow that was just submitted (a contribution page,
+    // an event registration, a webform). It is used once, for this contribution, and then removed: left in the
+    // session it was applied to the donor of every contribution the same user recorded afterwards, so a "Yes"
+    // saved for one donor created declarations for others.
+    // Only a truthy answer is applied, as on the released 3.7.2 line: a "No" applied to the wrong donor would end
+    // that donor's declaration.
     if ($session->get('uktaxpayer', E::LONG_NAME)) {
       $contactGiftAidEligibleStatus = $session->get('uktaxpayer', E::LONG_NAME);
     }
+    $answerIsForContactID = $session->get('uktaxpayerContactID', E::LONG_NAME);
+    $session->set('uktaxpayer', NULL, E::LONG_NAME);
+    $session->set('uktaxpayerContactID', NULL, E::LONG_NAME);
 
     // Get the gift aid eligible status
     // If it's not a valid number don't do any further processing
     if (!isset($contactGiftAidEligibleStatus)) {
+      $session->set('postProcessTitle', NULL, E::LONG_NAME);
       return;
     }
 
@@ -48,6 +55,13 @@ class CRM_Civigiftaid_Declaration {
       ->addWhere('id', '=', $contributionID)
       ->execute()
       ->first();
+
+    // An answer given by a known donor is for that donor's own contribution: it is not applied to another
+    // contact's (a staff user's own donation followed by a contribution recorded for someone else).
+    if ($answerIsForContactID && (int) $answerIsForContactID !== (int) $contribution['contact_id']) {
+      $session->set('postProcessTitle', NULL, E::LONG_NAME);
+      return;
+    }
 
     $startDate = $givenDate = $contribution['receive_date'];
     $contactID = $contribution['contact_id'];
@@ -61,7 +75,13 @@ class CRM_Civigiftaid_Declaration {
       'post_code' => $postCode,
       'eligible_for_gift_aid' => $contactGiftAidEligibleStatus,
     ];
-    self::setDeclaration($declarationParams);
+    try {
+      self::setDeclaration($declarationParams);
+    }
+    finally {
+      // The form's title is the declaration's source (read in setDeclaration): it goes with the answer.
+      $session->set('postProcessTitle', NULL, E::LONG_NAME);
+    }
   }
 
   /**

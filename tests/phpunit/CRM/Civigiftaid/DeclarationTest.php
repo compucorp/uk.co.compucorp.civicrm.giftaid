@@ -64,7 +64,6 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
 
     // First, where there is no declaration.
     $session = CRM_Core_Session::singleton();
-    $session->set('postProcessTitle', 'testDeclarationUpdate', E::LONG_NAME);
 
     foreach ([
                CRM_Civigiftaid_Declaration::DECLARATION_IS_YES => 'Yes',
@@ -72,6 +71,9 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
                CRM_Civigiftaid_Declaration::DECLARATION_IS_PAST_4_YEARS => 'Yes and past 4',
              ] as $type => $assertionContext) {
 
+      // The answer and the title of the form it came from are used once, then removed from the session: each round
+      // sets both, as each form submission does.
+      $session->set('postProcessTitle', 'testDeclarationUpdate', E::LONG_NAME);
       $session->set('uktaxpayer', $type, E::LONG_NAME);
       $assertionContext = "During '$assertionContext' declaration test round";
       // Clear static caches.
@@ -91,6 +93,11 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
       $declarations = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
       $this->assertIsArray($declarations, $assertionContext);
 
+      if ($type === CRM_Civigiftaid_Declaration::DECLARATION_IS_NO) {
+        // Only a truthy answer kept in the session is applied: a "No" creates no declaration.
+        $this->assertCount(0, $declarations, $assertionContext);
+        continue;
+      }
       $this->assertCount(1, $declarations, $assertionContext);
       $decl = $declarations[0];
       $this->assertEquals($this->contacts[0]['id'], $decl['entity_id'], $assertionContext);
@@ -119,6 +126,96 @@ class CRM_Civigiftaid_DeclarationTest extends \PHPUnit\Framework\TestCase implem
    *               */
 
   }
+  /**
+   * A Gift Aid answer kept in the session is applied to one contribution, then removed.
+   *
+   * It used to stay in the session: a "Yes" saved for one donor created a declaration for the donor of every
+   * contribution the same user recorded afterwards.
+   */
+  public function testSessionAnswerIsUsedOnceAndNotAppliedToAnotherDonor() {
+    $otherDonor = $this->createDonor('Another');
+    $session = CRM_Core_Session::singleton();
+    $session->set('postProcessTitle', 'testSessionAnswerIsUsedOnce', E::LONG_NAME);
+    $session->set('uktaxpayer', CRM_Civigiftaid_Declaration::DECLARATION_IS_YES, E::LONG_NAME);
+
+    // The donor the answer is for.
+    $this->contribute($this->contacts[0]['id'], 100);
+    $own = CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']);
+    $this->assertCount(1, $own, "the donor's own answer should be recorded");
+    $this->assertEquals(CRM_Civigiftaid_Declaration::DECLARATION_IS_YES, $own[0]['eligible_for_gift_aid']);
+    $this->assertNull($session->get('uktaxpayer', E::LONG_NAME), 'the answer should be removed from the session once used');
+    $this->assertNull($session->get('postProcessTitle', E::LONG_NAME), 'the form title should be removed with the answer');
+
+    // The next contribution the same user records, for another donor, in a later request.
+    $this->contribute($otherDonor, 50);
+    $this->assertCount(0, CRM_Civigiftaid_Declaration::getAllDeclarations($otherDonor), "another donor's contribution should create no declaration");
+  }
+
+  /**
+   * An answer given by a known donor is applied to that donor's contribution only, and is removed either way.
+   */
+  public function testSessionAnswerOfAKnownDonorIsNotAppliedToAnotherContact() {
+    $otherDonor = $this->createDonor('Someone Else');
+    $session = CRM_Core_Session::singleton();
+    $session->set('postProcessTitle', 'testSessionAnswerOfAKnownDonor', E::LONG_NAME);
+    $session->set('uktaxpayer', CRM_Civigiftaid_Declaration::DECLARATION_IS_YES, E::LONG_NAME);
+    $session->set('uktaxpayerContactID', $this->contacts[0]['id'], E::LONG_NAME);
+
+    // A contribution of another contact comes first: the answer is not for them, and it is not kept.
+    $this->contribute($otherDonor, 50);
+    $this->assertCount(0, CRM_Civigiftaid_Declaration::getAllDeclarations($otherDonor), 'the answer should not be applied to another contact');
+    $this->assertNull($session->get('uktaxpayer', E::LONG_NAME), 'the answer should be removed from the session');
+    $this->assertNull($session->get('uktaxpayerContactID', E::LONG_NAME), 'the contact the answer was for should be removed with it');
+
+    // The same answer, bound to the donor, then the donor's own contribution: recorded.
+    $session->set('postProcessTitle', 'testSessionAnswerOfAKnownDonor', E::LONG_NAME);
+    $session->set('uktaxpayer', CRM_Civigiftaid_Declaration::DECLARATION_IS_YES, E::LONG_NAME);
+    $session->set('uktaxpayerContactID', $this->contacts[0]['id'], E::LONG_NAME);
+    $this->contribute($this->contacts[0]['id'], 100);
+    $this->assertCount(1, CRM_Civigiftaid_Declaration::getAllDeclarations($this->contacts[0]['id']), "the donor's own contribution should record the answer");
+  }
+
+  /**
+   * The answer is kept only from the first step of a donation flow. The confirmation and thank-you steps hand
+   * back the first step's values after the contribution exists, and the declaration form on a contact's own
+   * screen writes the declaration itself.
+   */
+  public function testWhichFormsKeepTheirAnswerInTheSession() {
+    $this->assertTrue(_civigiftaid_keeps_answer_of_form('CRM_Contribute_Form_Contribution_Main'));
+    $this->assertTrue(_civigiftaid_keeps_answer_of_form('CRM_Event_Form_Registration_Register'));
+    $this->assertTrue(_civigiftaid_keeps_answer_of_form('CRM_Profile_Form_Edit'));
+    $this->assertFalse(_civigiftaid_keeps_answer_of_form('CRM_Contribute_Form_Contribution_Confirm'));
+    $this->assertFalse(_civigiftaid_keeps_answer_of_form('CRM_Contribute_Form_Contribution_ThankYou'));
+    $this->assertFalse(_civigiftaid_keeps_answer_of_form('CRM_Event_Form_Registration_Confirm'));
+    $this->assertFalse(_civigiftaid_keeps_answer_of_form('CRM_Contact_Form_CustomData'));
+    $this->assertFalse(_civigiftaid_keeps_answer_of_form('CRM_Contribute_Form_Contribution'));
+  }
+
+  /**
+   * An Individual donor of this test's own.
+   */
+  private function createDonor(string $firstName): int {
+    return (int) Contact::create(FALSE)
+      ->addValue('contact_type', 'Individual')
+      ->addValue('first_name', $firstName)
+      ->addValue('last_name', 'Donor')
+      ->execute()
+      ->first()['id'];
+  }
+
+  /**
+   * A contribution as a request of its own records it: the extension handles one contribution per request.
+   */
+  private function contribute(int $contactID, float $amount): void {
+    unset(Civi::$statics[E::LONG_NAME]);
+    unset(Civi::$statics['CRM_Civigiftaid_Declaration']);
+    Contribution::create(FALSE)
+      ->addValue('contact_id', $contactID)
+      ->addValue('financial_type_id', 1)
+      ->addValue('total_amount', $amount)
+      ->execute();
+  }
+
   /**
    * Test logic.
    *

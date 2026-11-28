@@ -73,6 +73,46 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
 }
 
 /**
+ * Whether the Gift Aid answer submitted on a form is kept in the session for the contribution that follows it.
+ *
+ * It is kept only from the first step of a donation flow, where the donor gives the answer and the contribution
+ * does not exist yet: a contribution page's main form, an event's registration form, a profile. It is not kept
+ * from the confirmation or thank-you steps, which hand back the first step's values after the contribution has
+ * been created (so the answer would be put back in the session once it had been used), nor from any other form.
+ * The declaration form on a contact's own screen, in particular, writes that contact's declaration itself: its
+ * answer has nothing to do with the contributions the same user records afterwards for other donors.
+ *
+ * @param string $formName
+ *
+ * @return bool
+ */
+function _civigiftaid_keeps_answer_of_form(string $formName): bool {
+  return in_array($formName, ['CRM_Contribute_Form_Contribution_Main', 'CRM_Event_Form_Registration_Register'], TRUE)
+    || strpos($formName, 'CRM_Profile_Form_') === 0;
+}
+
+/**
+ * The contact a form's Gift Aid answer is for, when the form knows it: the logged-in or identified donor of a
+ * contribution page or an event registration, the contact a profile edits. NULL for an anonymous donor, whose
+ * contact only exists once the contribution is created.
+ *
+ * @param \CRM_Core_Form $form
+ *
+ * @return int|null
+ */
+function _civigiftaid_contact_of_form($form): ?int {
+  $contactID = NULL;
+  if (strpos(get_class($form), 'CRM_Profile_Form_') === 0) {
+    // The contact the profile edits (or has just created), not the user who edits it.
+    $contactID = $form->getVar('_id');
+  }
+  elseif (is_callable([$form, 'getContactID'])) {
+    $contactID = $form->getContactID();
+  }
+  return is_numeric($contactID) && (int) $contactID > 0 ? (int) $contactID : NULL;
+}
+
+/**
  * Implementation of hook_civicrm_postProcess
  *
  * @param string $formName
@@ -84,7 +124,10 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
-  if (!$session->get('uktaxpayer', E::LONG_NAME)) {
+  // A first-step form that submits the answer always replaces what the session holds: an answer left by a flow
+  // that never reached its contribution (a profile edit, a page abandoned before confirming) must not stand in
+  // for this donor's own.
+  if (_civigiftaid_keeps_answer_of_form($formName)) {
     // let's get the id for custom field that is used for gift aid declaration
     $ukTaxPayerCustomFieldID = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', FALSE);
 
@@ -98,6 +141,13 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
     }
     if (isset($ukTaxPayer)) {
       $session->set('uktaxpayer', $ukTaxPayer, E::LONG_NAME);
+      // The donor the answer is for, when the form knows them: the answer is then applied to a contribution of
+      // that contact only (CRM_Civigiftaid_Declaration::update).
+      $session->set('uktaxpayerContactID', _civigiftaid_contact_of_form($form), E::LONG_NAME);
+      // The declaration this answer creates names the form the answer came from as its source.
+      if ($form->getTitle()) {
+        $session->set('postProcessTitle', $form->getTitle(), E::LONG_NAME);
+      }
     }
   }
   // Get the title of the submitted form
@@ -291,6 +341,7 @@ function _civigiftaid_drupal8_webform_uktaxpayer() {
   $session = CRM_Core_Session::singleton();
   // clear any old existing session var.
   $session->set('uktaxpayer', NULL, E::LONG_NAME);
+  $session->set('uktaxpayerContactID', NULL, E::LONG_NAME);
   $sessionuktaxpayer = $session->get('uktaxpayer', E::LONG_NAME);
 
   if (!$session->get('uktaxpayer', E::LONG_NAME)) {
