@@ -87,8 +87,13 @@ function civigiftaid_civicrm_buildForm($formName, &$form) {
  * @return bool
  */
 function _civigiftaid_keeps_answer_of_form(string $formName): bool {
-  return in_array($formName, ['CRM_Contribute_Form_Contribution_Main', 'CRM_Event_Form_Registration_Register'], TRUE)
-    || strpos($formName, 'CRM_Profile_Form_') === 0;
+  return in_array($formName, [
+    'CRM_Contribute_Form_Contribution_Main',
+    'CRM_Event_Form_Registration_Register',
+    // The profile forms that save a contact; a profile search saves nothing.
+    'CRM_Profile_Form_Edit',
+    'CRM_Profile_Form_Dynamic',
+  ], TRUE);
 }
 
 /**
@@ -124,10 +129,13 @@ function civigiftaid_civicrm_postProcess($formName, &$form) {
   // We save these values in the session so they can be used on the thankyou page of a contribute->confirm->thankyou.
   // Get and store the gift aid declaration value if set for use in civigiftaid_update_declaration_amount
   $session = CRM_Core_Session::singleton();
-  // A first-step form that submits the answer always replaces what the session holds: an answer left by a flow
-  // that never reached its contribution (a profile edit, a page abandoned before confirming) must not stand in
-  // for this donor's own.
+  // A first-step form always replaces what the session holds, whether or not it carries the Gift Aid question:
+  // an answer left by a flow that never reached its contribution (a profile edit, a page abandoned before
+  // confirming) must not stand in for this donor's own, nor for a donation that was not asked the question.
   if (_civigiftaid_keeps_answer_of_form($formName)) {
+    $session->set('uktaxpayer', NULL, E::LONG_NAME);
+    $session->set('uktaxpayerContactID', NULL, E::LONG_NAME);
+    $session->set('postProcessTitle', NULL, E::LONG_NAME);
     // let's get the id for custom field that is used for gift aid declaration
     $ukTaxPayerCustomFieldID = CRM_Civigiftaid_Utils::getCustomByName('eligible_for_gift_aid', 'gift_aid_declaration', FALSE);
 
